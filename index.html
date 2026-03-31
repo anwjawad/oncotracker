@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منظومة منسقي الأورام</title>
+    <!-- Modern Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Base CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-effect">
+            <div class="sidebar-header">
+                <h2>نظام المنسقين</h2>
+                <p>قسم الأورام</p>
+            </div>
+            <ul class="nav-links">
+                <li class="active" data-route="dashboard">
+                    <span class="icon">📊</span> لوحة القيادة
+                </li>
+                <li data-route="patients">
+                    <span class="icon">👥</span> سجل المرضى
+                </li>
+                <li data-route="cases">
+                    <span class="icon">📋</span> الحالات والمهام
+                </li>
+                <li data-route="admissions">
+                    <span class="icon">🏥</span> قوائم التنويم
+                </li>
+                <li data-route="port-cath">
+                    <span class="icon">💉</span> جدولة Port Cath
+                </li>
+                <li data-route="communications">
+                    <span class="icon">📞</span> سجل المراسلات
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <header class="topbar glass-effect">
+                <h1 id="page-title">لوحة القيادة</h1>
+                <div class="user-info">
+                    <div class="avatar">👨‍⚕️</div>
+                    <div class="details">
+                        <span class="name">منسق القسم</span>
+                        <span class="role">متصل</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dynamic Views Container -->
+            <div id="view-container" class="view-container">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p style="font-weight: 700; color: #64748b;">جاري المزامنة مع قاعدة البيانات...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals Container -->
+    <div id="modal-root"></div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/workflows.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

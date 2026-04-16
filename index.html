@@ -6,44 +6,89 @@
     <title>منظومة منسقي الأورام</title>
     <!-- Modern Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- PWA Meta Tags & Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f766e">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="منسقو الأورام">
     <!-- Base CSS -->
     <link rel="stylesheet" href="css/style.css">
+    <!-- SheetJS for Excel Parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar glass-effect">
             <div class="sidebar-header">
-                <h2>نظام المنسقين</h2>
-                <p>قسم الأورام</p>
+                <svg class="sidebar-logo" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#5eead4" />
+                            <stop offset="100%" stop-color="#0ea5e9" />
+                        </linearGradient>
+                    </defs>
+                    <path stroke="url(#logo-grad)" stroke-width="2.5" d="M8 22c0 0 3.5-9 4-14a4 4 0 1 1 8 0c0 5-5.5 14-5.5 14 M16 22c0 0-3.5-9-4-14a4 4 0 1 0-8 0c0 5 5.5 14 5.5 14" />
+                </svg>
+                <div class="sidebar-title-wrapper">
+                    <h2>نظام المنسقين</h2>
+                    <p>قسم الأورام</p>
+                </div>
             </div>
             <ul class="nav-links">
                 <li class="active" data-route="dashboard">
-                    <span class="icon">📊</span> لوحة القيادة
+                    <span class="icon">📊</span> <span class="nav-text">لوحة القيادة</span>
                 </li>
                 <li data-route="patients">
-                    <span class="icon">👥</span> سجل المرضى
+                    <span class="icon">👥</span> <span class="nav-text">سجل المرضى</span>
                 </li>
                 <li data-route="cases">
-                    <span class="icon">📋</span> الحالات والمهام
+                    <span class="icon">📋</span> <span class="nav-text">الحالات والمهام</span>
                 </li>
                 <li data-route="admissions">
-                    <span class="icon">🏥</span> قوائم التنويم
+                    <span class="icon">🏥</span> <span class="nav-text">قوائم التنويم</span>
                 </li>
                 <li data-route="port-cath">
-                    <span class="icon">💉</span> جدولة Port Cath
+                    <span class="icon">💉</span> <span class="nav-text">جدولة Port Cath</span>
+                </li>
+                <li data-route="post-clinic">
+                    <span class="icon">🏥</span> <span class="nav-text">حجوزات بعد العيادة</span>
+                </li>
+                <li data-route="new-cases">
+                    <span class="icon">📁</span> <span class="nav-text">لجنة الحالات الجديدة</span>
+                </li>
+                <li data-route="bulk-actions" style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
+                    <span class="icon">⚡</span> <span class="nav-text">مركز المهام السريعة</span>
                 </li>
                 <li data-route="communications">
-                    <span class="icon">📞</span> سجل المراسلات
+                    <span class="icon">📞</span> <span class="nav-text">سجل المراسلات</span>
                 </li>
             </ul>
         </aside>
 
+        <!-- Overlay for Mobile Sidebar -->
+        <div id="sidebar-overlay" class="sidebar-overlay"></div>
+        
         <!-- Main Content Area -->
         <main class="main-content">
             <!-- Topbar -->
             <header class="topbar glass-effect">
-                <h1 id="page-title">لوحة القيادة</h1>
+                <div class="topbar-right-container">
+                    <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Menu">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                    <h1 id="page-title">لوحة القيادة</h1>
+                </div>
+
+                <div class="spotlight-trigger" onclick="UI.openSpotlight()" title="ابحث عن مريض أو مهمة (Ctrl + K)">
+                    <span class="search-icon">🔍</span>
+                    <span class="search-text" style="text-align:right;">البحث الذكي الشامل...</span>
+                    <span class="search-kbd">⌘K</span>
+                </div>
+
                 <div class="user-info">
                     <div class="avatar">👨‍⚕️</div>
                     <div class="details">
@@ -61,6 +106,18 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Install Prompt Banner -->
+    <div id="install-banner" class="install-banner">
+        <div class="install-info">
+            <h4>تثبيت التطبيق</h4>
+            <p>قم بتثبيت منظومة الأورام للوصول السريع</p>
+        </div>
+        <div class="install-actions">
+            <button id="install-btn" class="btn btn-primary">تثبيت الآن</button>
+            <button id="close-install-btn" class="btn" style="background: transparent; border: 1px solid var(--border); box-shadow: none;">لاحقاً</button>
+        </div>
     </div>
 
     <!-- Modals Container -->

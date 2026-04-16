@@ -54,6 +54,7 @@ const API = {
         await this.initSync(); 
         return caseId ? this._cache.tasks.filter(t => t.caseId === caseId) : this._cache.tasks;
     },
+    getPostClinicBookings: async function() { await this.initSync(); return this._cache.postClinicBookings || []; },
 
     // ----------------------------------------
     // Write Mutations (Optimistic UI Updates)
@@ -100,6 +101,60 @@ const API = {
     createPortCath: async function(portData) {
         this._cache.portCath.push(portData);
         return await this._fetchGAS('CREATE_PORTCATH', { data: portData });
+    },
+    createPostClinicBooking: async function(data) {
+        if(!this._cache.postClinicBookings) this._cache.postClinicBookings = [];
+        this._cache.postClinicBookings.push(data);
+        return await this._fetchGAS('CREATE_POSTCLINIC', { data: data });
+    },
+    createBatchPostClinicBookings: async function(dataArray) {
+        if(!this._cache.postClinicBookings) this._cache.postClinicBookings = [];
+        this._cache.postClinicBookings.push(...dataArray);
+        return await this._fetchGAS('BATCH_ADD_POSTCLINIC', { data: dataArray });
+    },
+    updatePostClinicBooking: async function(data) {
+        if(!this._cache.postClinicBookings) return;
+        let index = this._cache.postClinicBookings.findIndex(t => t.id === data.id);
+        if(index > -1) this._cache.postClinicBookings[index] = data;
+        return await this._fetchGAS('UPDATE_POSTCLINIC', { data: data });
+    },
+    deletePostClinicBooking: async function(id) {
+        if(!this._cache.postClinicBookings) return;
+        this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => b.id !== id);
+        return await this._fetchGAS('DELETE_ROW', { sheetName: 'PostClinicBookings', id: id });
+    },
+    deleteProviderBookings: async function(providerName) {
+        if(!this._cache.postClinicBookings) return;
+        this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => b.providerName !== providerName);
+        return await this._fetchGAS('DELETE_PROVIDER_POSTCLINIC', { providerName: providerName });
+    },
+
+    getNewCasesMeeting: async function() { await this.initSync(); return this._cache.newCasesMeeting || []; },
+    createNewCaseMeeting: async function(data) {
+        if(!this._cache.newCasesMeeting) this._cache.newCasesMeeting = [];
+        this._cache.newCasesMeeting.push(data);
+        return await this._fetchGAS('CREATE_NEW_CASE', { data: data });
+    },
+    createBatchNewCases: async function(dataArray) {
+        if(!this._cache.newCasesMeeting) this._cache.newCasesMeeting = [];
+        this._cache.newCasesMeeting.push(...dataArray);
+        return await this._fetchGAS('BATCH_ADD_NEW_CASES', { data: dataArray });
+    },
+    updateNewCaseMeeting: async function(data) {
+        if(!this._cache.newCasesMeeting) return;
+        let idx = this._cache.newCasesMeeting.findIndex(b => b.id === data.id);
+        if(idx !== -1) this._cache.newCasesMeeting[idx] = data;
+        return await this._fetchGAS('UPDATE_NEW_CASE', { data: data });
+    },
+    deleteNewCaseMeeting: async function(id) {
+        if(!this._cache.newCasesMeeting) return;
+        this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => b.id !== id);
+        return await this._fetchGAS('DELETE_ROW', { sheetName: 'NewCasesMeeting', id: id });
+    },
+    deleteProviderNewCases: async function(providerName) {
+        if(!this._cache.newCasesMeeting) return;
+        this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => b.primaryPhysician !== providerName);
+        return await this._fetchGAS('DELETE_PROVIDER_NEW_CASES', { providerName: providerName });
     },
 
     // Local manual recalculate to avoid requesting the heavy dashboard array sync

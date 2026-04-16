@@ -18,6 +18,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     
+    // Global Keyboard Listeners
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            if(window.UI && UI.openSpotlight) UI.openSpotlight();
+        }
+    });
+    
     function navigateTo(route) {
         switch(route) {
             case 'dashboard':
@@ -35,6 +43,15 @@ document.addEventListener("DOMContentLoaded", () => {
             case 'port-cath':
                 UI.renderPortCath();
                 break;
+            case 'post-clinic':
+                UI.renderPostClinicBookings();
+                break;
+            case 'new-cases':
+                UI.renderNewCasesMeeting();
+                break;
+            case 'bulk-actions':
+                UI.renderBulkActions();
+                break;
             case 'communications':
                 UI.renderCommunications();
                 break;
@@ -42,4 +59,101 @@ document.addEventListener("DOMContentLoaded", () => {
                 UI.renderDashboard();
         }
     }
+    
+    // Sidebar Toggle Logic
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    function toggleSidebar() {
+        if (window.innerWidth <= 768) {
+            // Mobile: slide in/out
+            sidebar.classList.toggle('active');
+            sidebarOverlay.classList.toggle('active');
+        } else {
+            // Desktop: collapse/expand
+            sidebar.classList.toggle('collapsed');
+        }
+    }
+
+    if (menuToggleBtn) menuToggleBtn.addEventListener('click', toggleSidebar);
+    
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+                sidebarOverlay.classList.remove('active');
+            }
+        });
+    }
+
+    // Close sidebar when clicking a nav link on mobile
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+                sidebarOverlay.classList.remove('active');
+            }
+        });
+    });
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+        });
+    }
+
+    // PWA Install Prompt Logic
+    let deferredPrompt;
+    const installBanner = document.getElementById('install-banner');
+    const installBtn = document.getElementById('install-btn');
+    const closeInstallBtn = document.getElementById('close-install-btn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        // Update UI notify the user they can install the PWA
+        setTimeout(() => {
+            if (installBanner) installBanner.classList.add('show');
+        }, 1500);
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            // Hide the app provided install promotion
+            installBanner.classList.remove('show');
+            // Show the install prompt
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                // Wait for the user to respond to the prompt
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                // We've used the prompt, and can't use it again, throw it away
+                deferredPrompt = null;
+            }
+        });
+    }
+
+    if (closeInstallBtn) {
+        closeInstallBtn.addEventListener('click', () => {
+             installBanner.classList.remove('show');
+        });
+    }
+
+    // Optionally Handle Successful Installation Event
+    window.addEventListener('appinstalled', () => {
+        // Hide the app-provided install promotion
+        installBanner.classList.remove('show');
+        // Clear the deferredPrompt so it can be garbage collected
+        deferredPrompt = null;
+        console.log('PWA was installed');
+    });
 });

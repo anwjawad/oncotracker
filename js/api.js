@@ -123,10 +123,10 @@ const API = {
         this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => b.id !== id);
         return await this._fetchGAS('DELETE_ROW', { sheetName: 'PostClinicBookings', id: id });
     },
-    deleteProviderBookings: async function(providerName) {
+    deleteProviderBookings: async function(providerName, sessionDate) {
         if(!this._cache.postClinicBookings) return;
-        this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => b.providerName !== providerName);
-        return await this._fetchGAS('DELETE_PROVIDER_POSTCLINIC', { providerName: providerName });
+        this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => !(b.providerName === providerName && b.sessionDate === sessionDate));
+        return await this._fetchGAS('DELETE_PROVIDER_POSTCLINIC', { providerName: providerName, sessionDate: sessionDate });
     },
 
     getNewCasesMeeting: async function() { await this.initSync(); return this._cache.newCasesMeeting || []; },
@@ -151,10 +151,10 @@ const API = {
         this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => b.id !== id);
         return await this._fetchGAS('DELETE_ROW', { sheetName: 'NewCasesMeeting', id: id });
     },
-    deleteProviderNewCases: async function(providerName) {
+    deleteProviderNewCases: async function(providerName, sessionDate) {
         if(!this._cache.newCasesMeeting) return;
-        this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => b.primaryPhysician !== providerName);
-        return await this._fetchGAS('DELETE_PROVIDER_NEW_CASES', { providerName: providerName });
+        this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => !(b.primaryPhysician === providerName && b.sessionDate === sessionDate));
+        return await this._fetchGAS('DELETE_PROVIDER_NEW_CASES', { providerName: providerName, sessionDate: sessionDate });
     },
 
     // Local manual recalculate to avoid requesting the heavy dashboard array sync

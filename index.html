@@ -16,10 +16,46 @@
     <meta name="apple-mobile-web-app-title" content="منسقو الأورام">
     <!-- Base CSS -->
     <link rel="stylesheet" href="css/style.css">
+    <!-- Feature Pack CSS -->
+    <link rel="stylesheet" href="css/features.css">
+    <!-- Visual WOW CSS -->
+    <link rel="stylesheet" href="css/visual_wow.css">
     <!-- SheetJS for Excel Parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style id="accordion-styles">
+        .pc-accordion-card {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.3s ease;
+        }
+        .pc-accordion-card:hover { border-color: #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .accordion-header {
+            display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; cursor: pointer; background: #f8fafc; transition: background 0.2s;
+        }
+        .accordion-header:hover { background: #f1f5f9; }
+        .accordion-icon { transition: transform 0.3s ease; color: #94a3b8; }
+        .accordion-body { padding: 20px; border-top: 1px solid #e2e8f0; display: none; flex-direction: column; gap: 16px; background: #fff; }
+        
+        .pc-accordion-card.expanded .accordion-body { display: flex !important; }
+        .pc-accordion-card.expanded .accordion-icon { transform: rotate(180deg); }
+        .pc-accordion-card.expanded .accordion-header { background: #fff; border-bottom: 1px solid #f1f5f9; }
+
+        /* Minimal Inputs */
+        .minimal-input {
+            border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 10px; font-family: inherit; font-size: 0.95rem; color: #334155; width: 100%; transition: border-color 0.2s;
+        }
+        .minimal-input:focus { border-color: #0d9488; outline: none; box-shadow: 0 0 0 2px rgba(13,148,136,0.1); }
+        .minimal-textarea {
+            resize: vertical; min-height: 80px; width: 100%;
+        }
+        .field-label {
+            font-size: 0.85rem; font-weight: 700; color: #64748b; margin-bottom: 6px; display: block;
+        }
+    </style>
 </head>
 <body>
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle" onclick="UI.toggleDarkMode()" title="تبديل الوضع الليلي">🌙</button>
+    <!-- Save Indicator -->
+    <div id="save-indicator"><div class="save-dot"></div><span id="save-indicator-text">جاري الحفظ...</span></div>
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar glass-effect">
@@ -39,31 +75,31 @@
                 </div>
             </div>
             <ul class="nav-links">
-                <li class="active" data-route="dashboard">
+                <li style="display: none;" data-route="dashboard">
                     <span class="icon">📊</span> <span class="nav-text">لوحة القيادة</span>
                 </li>
-                <li data-route="patients">
+                <li style="display: none;" data-route="patients">
                     <span class="icon">👥</span> <span class="nav-text">سجل المرضى</span>
                 </li>
-                <li data-route="cases">
+                <li style="display: none;" data-route="cases">
                     <span class="icon">📋</span> <span class="nav-text">الحالات والمهام</span>
                 </li>
-                <li data-route="admissions">
+                <li style="display: none;" data-route="admissions">
                     <span class="icon">🏥</span> <span class="nav-text">قوائم التنويم</span>
                 </li>
-                <li data-route="port-cath">
+                <li style="display: none;" data-route="port-cath">
                     <span class="icon">💉</span> <span class="nav-text">جدولة Port Cath</span>
+                </li>
+                <li class="active" data-route="new-cases">
+                    <span class="icon">📁</span> <span class="nav-text">لجنة الحالات الجديدة</span>
                 </li>
                 <li data-route="post-clinic">
                     <span class="icon">🏥</span> <span class="nav-text">حجوزات بعد العيادة</span>
                 </li>
-                <li data-route="new-cases">
-                    <span class="icon">📁</span> <span class="nav-text">لجنة الحالات الجديدة</span>
-                </li>
-                <li data-route="bulk-actions" style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
+                <li style="display: none;" data-route="bulk-actions" style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
                     <span class="icon">⚡</span> <span class="nav-text">مركز المهام السريعة</span>
                 </li>
-                <li data-route="communications">
+                <li style="display: none;" data-route="communications">
                     <span class="icon">📞</span> <span class="nav-text">سجل المراسلات</span>
                 </li>
             </ul>
@@ -76,11 +112,15 @@
         <main class="main-content">
             <!-- Topbar -->
             <header class="topbar glass-effect">
-                <div class="topbar-right-container">
+                <div class="topbar-right-container" style="display:flex; align-items:center;">
                     <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Menu">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                     </button>
                     <h1 id="page-title">لوحة القيادة</h1>
+                    <div style="margin-right:20px; display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.85rem; font-weight:800; color:#475569;">📅 تاريخ الجلسة:</span>
+                        <input type="date" id="global-archive-date" style="padding:6px; border-radius:6px; border:1px solid #cbd5e1; font-weight:bold; color:var(--primary); font-size:0.9rem; cursor:pointer;">
+                    </div>
                 </div>
 
                 <div class="spotlight-trigger" onclick="UI.openSpotlight()" title="ابحث عن مريض أو مهمة (Ctrl + K)">
@@ -89,14 +129,68 @@
                     <span class="search-kbd">⌘K</span>
                 </div>
 
-                <div class="user-info">
-                    <div class="avatar">👨‍⚕️</div>
+                <div class="user-info" onclick="UI.openSettings()" style="cursor:pointer;" title="الإعدادات">
+                    <div class="avatar">⚙️</div>
                     <div class="details">
-                        <span class="name">منسق القسم</span>
-                        <span class="role">متصل</span>
+                        <span class="name">الإعدادات</span>
+                        <span class="role">تخصيص</span>
                     </div>
                 </div>
             </header>
+
+            <!-- Settings Modal -->
+            <div id="settings-modal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); align-items:center; justify-content:center;">
+                <div style="background:#fff; border-radius:20px; padding:32px; width:520px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,0.25); position:relative;">
+                    
+                    <!-- Header -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:28px;">
+                        <div>
+                            <h2 style="margin:0; font-size:1.4rem;">⚙️ الإعدادات</h2>
+                            <p style="color:#64748b; margin:4px 0 0; font-size:0.9rem;">تخصيص التطبيق حسب احتياجاتك</p>
+                        </div>
+                        <button onclick="UI.closeSettings()" style="background:#f1f5f9; border:none; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:1.2rem;">✕</button>
+                    </div>
+
+                    <!-- Section: Theme Color -->
+                    <div style="margin-bottom:28px;">
+                        <h3 style="font-size:1rem; font-weight:800; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #f1f5f9;">🎨 لون الثيم</h3>
+                        <div id="theme-swatches" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
+                    </div>
+
+                    <!-- Section: Logo Upload -->
+                    <div style="margin-bottom:28px;">
+                        <h3 style="font-size:1rem; font-weight:800; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #f1f5f9;">🏷️ شعار المؤسسة (Logo)</h3>
+                        <div style="display:flex; flex-direction:column; gap:12px; align-items:flex-start;">
+                            <img id="logo-preview" style="display:none; max-height:80px; max-width:200px; border-radius:8px; border:1px solid #e2e8f0; padding:6px; object-fit:contain;">
+                            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                <label style="background:#0f766e; color:white; padding:9px 18px; border-radius:9px; cursor:pointer; font-weight:700; font-size:0.9rem;">
+                                    📤 رفع الشعار
+                                    <input type="file" accept="image/*" style="display:none;" onchange="UI.uploadLogo(event)">
+                                </label>
+                                <button id="logo-remove-btn" onclick="UI.removeLogo()" style="display:none; background:#fee2e2; color:#ef4444; border:none; padding:9px 18px; border-radius:9px; cursor:pointer; font-weight:700; font-size:0.9rem;">🗑️ حذف الشعار</button>
+                            </div>
+                            <p style="font-size:0.8rem; color:#94a3b8; margin:0;">يظهر الشعار في أعلى يسار جدول الطباعة. الأحجام المقبولة: PNG، JPG، SVG</p>
+                        </div>
+                    </div>
+
+                    <!-- Section: Print Settings -->
+
+                    <div style="margin-bottom:28px;">
+                        <h3 style="font-size:1rem; font-weight:800; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #f1f5f9;">🖨️ إعدادات الطباعة</h3>
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:700; color:#475569; margin-bottom:6px; display:block;">اسم المستشفى / المؤسسة</label>
+                                <input type="text" id="print-hospital-name" placeholder="مثال: مستشفى الملك حسين" style="width:100%; padding:10px 14px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.95rem; outline:none;" oninput="UI.savePrintSettings()">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:700; color:#475569; margin-bottom:6px; display:block;">اسم القسم / اللجنة</label>
+                                <input type="text" id="print-department-name" placeholder="مثال: وحدة الأورام" style="width:100%; padding:10px 14px; border:1px solid #e2e8f0; border-radius:10px; font-size:0.95rem; outline:none;" oninput="UI.savePrintSettings()">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
 
             <!-- Dynamic Views Container -->
             <div id="view-container" class="view-container">

@@ -31,7 +31,7 @@
 body {
     background-color: var(--bg-main);
     color: var(--text-main);
-    overflow: hidden;
+    overflow: hidden; /* Keep body locked, scroll handled by main-content */
     direction: rtl; /* Enforce RTL globally */
 }
 

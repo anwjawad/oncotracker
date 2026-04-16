@@ -1,9 +1,31 @@
 document.addEventListener("DOMContentLoaded", () => {
     
+    // Set Global Archive Date to Today
+    window.globalArchiveDate = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    let dateInput = document.getElementById('global-archive-date');
+    if(dateInput) {
+        dateInput.value = window.globalArchiveDate;
+        dateInput.addEventListener('change', (e) => {
+            window.globalArchiveDate = e.target.value;
+            // Force re-render of active tab if it's sensitive to date
+            let activeRoute = document.querySelector('.nav-links li.active')?.getAttribute('data-route');
+            if(activeRoute === 'post-clinic') {
+                if (typeof UI !== 'undefined') UI.renderPostClinicBookings();
+            }
+            if(activeRoute === 'new-cases') {
+                if (typeof UI !== 'undefined') UI.renderNewCasesMeeting();
+            }
+        });
+    }
+
+    // load saved settings
+    if (typeof UI !== 'undefined') UI.loadSavedSettings();
+    if (typeof UI !== 'undefined') UI.loadDarkMode();
+
     const navItems = document.querySelectorAll('.nav-links li');
     
     // Initial Load
-    navigateTo('dashboard');
+    navigateTo('new-cases');
     
     // Setup Routing
     navItems.forEach(item => {

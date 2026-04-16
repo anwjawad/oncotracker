@@ -1,0 +1,194 @@
+
+/* ============================================
+   FEATURE PACK: Skeleton, Dark Mode, Save Indicator, Stats Bar
+   ============================================ */
+
+/* ─── 1. SKELETON LOADING ─── */
+.skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    padding: 0;
+}
+.skeleton-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+.skeleton-line {
+    border-radius: 6px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ─── 2. HOVER LIFT for cards ─── */
+.pc-dossier-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.pc-dossier-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.1) !important;
+}
+
+/* ─── 3. SAVE INDICATOR ─── */
+#save-indicator {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateY(16px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 9999;
+    pointer-events: none;
+}
+#save-indicator.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+#save-indicator .save-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    animation: pulse-save 1s infinite;
+}
+#save-indicator.saved .save-dot {
+    background: #10b981;
+    animation: none;
+}
+@keyframes pulse-save {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* ─── 4. STATS BAR ─── */
+.session-stats-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+}
+.stat-chip .stat-value {
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: var(--primary);
+    min-width: 18px;
+    text-align: center;
+}
+.stat-chip:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* ─── 5. DARK MODE ─── */
+body.dark-mode {
+    --bg-main: #0f172a;
+    --border: #1e293b;
+    --text-main: #e2e8f0;
+    --text-muted: #94a3b8;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+    background: #0f172a;
+    color: #e2e8f0;
+}
+body.dark-mode .pc-dossier-card,
+body.dark-mode .stat-chip,
+body.dark-mode .skeleton-card {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #e2e8f0;
+}
+body.dark-mode .pc-dossier-card textarea,
+body.dark-mode .pc-dossier-card input {
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+}
+body.dark-mode .topbar,
+body.dark-mode .card {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+body.dark-mode .view-container {
+    background: #0f172a;
+}
+body.dark-mode .pc-tabs button {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+}
+body.dark-mode select,
+body.dark-mode .pc-select {
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+}
+body.dark-mode .no-print > div {
+    background: #1e293b !important;
+}
+body.dark-mode .stat-chip .stat-value {
+    color: #5eead4;
+}
+
+/* ─── 6. DARK MODE TOGGLE BUTTON ─── */
+#dark-mode-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #1e293b;
+    color: #fff;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    z-index: 999;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#dark-mode-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+body.dark-mode #dark-mode-toggle {
+    background: #f8fafc;
+    color: #0f172a;
+}

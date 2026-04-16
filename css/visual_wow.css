@@ -1,0 +1,139 @@
+
+/* ============================================
+   VISUAL WOW PACK: Glassmorphism, Wave, Hover Lift, Animated Counter
+   ============================================ */
+
+/* ─── 1. GLASSMORPHISM CARDS ─── */
+.pc-dossier-card {
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06),
+                inset 0 1px 0 rgba(255,255,255,0.8) !important;
+    border-radius: 16px !important;
+    position: relative;
+    overflow: hidden;
+}
+/* Subtle inner gloss line */
+.pc-dossier-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+    pointer-events: none;
+}
+
+/* ─── 2. HOVER LIFT (enhanced) ─── */
+.pc-dossier-card {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.25s ease !important;
+    will-change: transform;
+}
+.pc-dossier-card:hover {
+    transform: translateY(-6px) scale(1.01) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.14),
+                0 0 0 1px rgba(255,255,255,0.7),
+                inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+/* Dark mode glassmorphism */
+body.dark-mode .pc-dossier-card {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* ─── 3. ANIMATED WAVE BACKGROUND ─── */
+.view-container {
+    position: relative;
+    /* overflow NOT hidden - wave uses position:fixed so no clipping needed */
+}
+.view-container::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(ellipse at 20% 50%, rgba(15, 118, 110, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(56, 189, 248, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 50%);
+    animation: wave-drift 12s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+}
+.view-container > * {
+    position: relative;
+    z-index: 1;
+}
+@keyframes wave-drift {
+    0%   { transform: translate(0%, 0%) rotate(0deg); }
+    33%  { transform: translate(2%, 1%) rotate(1deg); }
+    66%  { transform: translate(-1%, 2%) rotate(-1deg); }
+    100% { transform: translate(1%, -1%) rotate(0.5deg); }
+}
+
+/* Dark mode wave */
+body.dark-mode .view-container::before {
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(15, 118, 110, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 80%, rgba(124, 58, 237, 0.07) 0%, transparent 50%);
+}
+
+/* ─── 4. ANIMATED STAT COUNTER ─── */
+.stat-value {
+    display: inline-block;
+    transition: all 0.3s;
+}
+.stat-value.counting {
+    animation: count-pulse 0.4s ease;
+}
+@keyframes count-pulse {
+    0%   { transform: scale(1.4); opacity:0.6; }
+    100% { transform: scale(1); opacity:1; }
+}
+
+/* Tab glow for active */
+.pc-tabs button[style*="background:var(--primary)"],
+.pc-tabs button[style*="background: var(--primary)"] {
+    box-shadow: 0 4px 16px rgba(15, 118, 110, 0.35) !important;
+    animation: tab-glow 2s ease-in-out infinite alternate;
+}
+@keyframes tab-glow {
+    0%   { box-shadow: 0 4px 12px rgba(15,118,110,0.25); }
+    100% { box-shadow: 0 6px 22px rgba(15,118,110,0.45); }
+}
+
+/* Stat chip shine on enter */
+.stat-chip {
+    animation: slide-in-stat 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.stat-chip:nth-child(1) { animation-delay: 0.05s; }
+.stat-chip:nth-child(2) { animation-delay: 0.1s; }
+.stat-chip:nth-child(3) { animation-delay: 0.15s; }
+.stat-chip:nth-child(4) { animation-delay: 0.2s; }
+@keyframes slide-in-stat {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Cards stagger entrance animation */
+.pc-dossier-card {
+    animation: card-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pc-dossier-card:nth-child(1) { animation-delay: 0.03s; }
+.pc-dossier-card:nth-child(2) { animation-delay: 0.07s; }
+.pc-dossier-card:nth-child(3) { animation-delay: 0.11s; }
+.pc-dossier-card:nth-child(4) { animation-delay: 0.15s; }
+.pc-dossier-card:nth-child(5) { animation-delay: 0.19s; }
+.pc-dossier-card:nth-child(6) { animation-delay: 0.23s; }
+.pc-dossier-card:nth-child(n+7) { animation-delay: 0.27s; }
+@keyframes card-enter {
+    from { opacity: 0; transform: translateY(20px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}

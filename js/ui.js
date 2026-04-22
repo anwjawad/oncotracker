@@ -1057,6 +1057,122 @@ Oncology Coordinator System`;
     // Post Clinic Bookings Feature (Excel, Sync, Dynamic Columns)
     // ============================================
     pcCustomColumns: [],
+    followUpSearchQuery: '',
+
+    getPCBookingCardHTML: function(b, isRegisteredInMeeting) {
+        // Detect if we are on the Follow-up page via a temp flag or context
+        const isFollowUpPage = document.querySelector('.nav-links li.active')?.getAttribute('data-route') === 'follow-up';
+        const inFollowUp = b.followUpStatus === 'ACTIVE';
+
+        let customData = {};
+        if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
+
+        let dynamicFields = this.pcCustomColumns.map(col => `
+             <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; margin-bottom:4px;">
+                 <label style="font-size:0.8rem; color:var(--text-muted); font-weight:800; margin:0;">${col}</label>
+                 <input type="text" class="pc-input" value="${customData[col] || ''}" onchange="UI.updatePCRow('${b.id}', 'custom_${col}', this.value)" style="background:#fff; width:65%; padding:4px 6px; font-size:0.85rem;">
+             </div>
+         `).join('');
+
+        return `
+         <div class="pc-dossier-card" id="tr-${b.id}" style="background:#fff; border:1px solid ${inFollowUp ? '#fbbf24' : 'var(--border)'}; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; min-width:300px; max-width: 100%; position:relative; overflow:hidden;">
+             
+             <!-- Badge: Meeting -->
+             ${isRegisteredInMeeting ? `
+             <div class="meeting-badge" style="position:absolute; top:10px; left:-35px; background:linear-gradient(135deg, #0d9488, #0f766e); color:white; padding:4px 40px; transform: rotate(-45deg); font-size:0.75rem; font-weight:900; box-shadow:0 2px 4px rgba(0,0,0,0.2); z-index:1;" title="المريض مسجل في لجنة الحالات الجديدة">
+                📋 مسجل باللجنة
+             </div>
+             ` : ''}
+
+             <!-- Badge: Follow-up -->
+             ${inFollowUp ? `
+             <div style="position:absolute; top:10px; right:10px; background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:20px; font-size:0.75rem; font-weight:900; display:flex; align-items:center; gap:4px; border:1px solid #fde68a; z-index:2;">
+                ⏳ قيد المتابعة
+             </div>
+             ` : ''}
+
+             <div class="dos-field" style="display:flex; flex-direction:column;">
+                 <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="font-size:0.95rem; color:var(--primary); font-weight:900; margin-bottom:8px;">👤 Patient Name</label>
+                    ${isRegisteredInMeeting ? '<span style="color:#0d9488; font-size:1.2rem;" title="تلقائي: تم تحويل المريض للجنة">🔘</span>' : ''}
+                 </div>
+                 <textarea class="pc-input pc-name-input" onchange="UI.updatePCRow('${b.id}', 'patientName', this.value)" style="resize:vertical; min-height:45px; height:45px; font-size:1.15rem; font-weight:800; color:#0f766e; background:#f0fdfa; border:2px solid #0d9488;" oninput="this.style.height=''; this.style.height=this.scrollHeight+'px'">${b.patientName || ''}</textarea>
+             </div>
+
+             ${inFollowUp && b.followUpNotes ? `
+             <div style="background:#fffbeb; padding:10px; border-radius:8px; border-right:4px solid #f59e0b; font-size:0.9rem; color:#92400e;">
+                <strong>📌 ملاحظة المتابعة:</strong><br>
+                ${b.followUpNotes}
+             </div>
+             ` : ''}
+
+             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                 <div style="display:flex; flex-direction:column;">
+                     <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Code</label>
+                     <input type="text" class="pc-input" value="${b.patientCode || ''}" onchange="UI.updatePCRow('${b.id}', 'patientCode', this.value)" style="font-family:monospace; font-weight:700;">
+                 </div>
+                 <div style="display:flex; flex-direction:column;">
+                     <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Age</label>
+                     <input type="text" class="pc-input" value="${b.patientAge || ''}" onchange="UI.updatePCRow('${b.id}', 'patientAge', this.value)" style="text-align:center;">
+                 </div>
+             </div>
+             <div style="display:flex; flex-direction:column;">
+                 <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Phone</label>
+                 <input type="text" class="pc-input" value="${b.phoneNumber || ''}" onchange="UI.updatePCRow('${b.id}', 'phoneNumber', this.value)" style="direction:ltr;">
+             </div>
+             <div style="display:flex; flex-direction:column;">
+                 <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">👨‍⚕️ Provider (Doctor)</label>
+                 <input type="text" class="pc-input" value="${b.providerName || ''}" onchange="UI.updatePCRow('${b.id}', 'providerName', this.value)" style="background:#f1f5f9; font-weight:700;">
+             </div>
+             <div style="display:flex; flex-direction:column;">
+                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <label style="font-size:0.95rem; color:#b45309; font-weight:900; margin:0;">📋 Treatment Plan</label>
+                    <button class="btn" style="padding:2px 8px; font-size:0.75rem; background:#fef3c7; color:#92400e; border:1px solid #fcd34d;" onclick="const area = this.parentElement.nextElementSibling; const preview = area.nextElementSibling; if(area.style.display==='none'){area.style.display='block'; preview.style.display='none'; this.textContent='View';}else{area.style.display='none'; preview.style.display='block'; this.textContent='Edit';}">تعديل</button>
+                 </div>
+                 <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'treatmentPlan', this.value)" style="display:none; resize:vertical; min-height:100px; width:100%; border:2px solid #f59e0b; background:#fffbeb; font-size:1.1rem; font-weight:600; color:#92400e; line-height:1.6;">${b.treatmentPlan || ''}</textarea>
+                 <div class="pc-plan-preview" style="min-height:85px; width:100%; border:2px solid #f59e0b; background:#fffbeb; font-size:1.1rem; font-weight:600; color:#92400e; line-height:1.6; padding:10px; border-radius:8px; white-space:pre-wrap; overflow-wrap: break-word;">${b.treatmentPlan || '<span style="color:#94a3b8; font-style:italic;">لا توجد خطة مسجلة</span>'}</div>
+             </div>
+             <div style="display:flex; flex-direction:column; gap:12px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-top:auto;">
+                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                     <input type="checkbox" ${b.notifiedPatient === 'Y' ? 'checked' : ''} onchange="UI.updatePCRow('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')" style="transform:scale(1.2);">
+                     <strong style="color:var(--primary); font-size:0.9rem;">تم التبليغ ✅</strong>
+                 </label>
+                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                     <strong style="font-size:0.85rem; color:var(--text-muted);">OPC Appt:</strong>
+                     <input type="date" class="pc-input" style="padding:4px 6px; font-size:0.85rem; width:150px;" value="${b.opcDate || ''}" onchange="UI.updatePCRow('${b.id}', 'opcDate', this.value)">
+                 </div>
+                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                     <div style="display:flex; align-items:center; gap:4px;">
+                         <label style="margin:0; font-size:0.8rem; font-weight:800; color:var(--text-muted);">Permit:</label>
+                         <select class="pc-select ${b.permit === 'Y' ? 'yes' : b.permit === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'permit', this.value)" style="padding:4px; font-size:0.8rem; flex:1;">
+                             <option value="">-</option>
+                             <option value="Y" ${b.permit === 'Y' ? 'selected' : ''}>Y</option>
+                             <option value="N" ${b.permit === 'N' ? 'selected' : ''}>N</option>
+                         </select>
+                     </div>
+                     <div style="display:flex; align-items:center; gap:4px;">
+                         <label style="margin:0; font-size:0.8rem; font-weight:800; color:var(--text-muted);">Referral:</label>
+                         <select class="pc-select ${b.referral === 'Y' ? 'yes' : b.referral === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'referral', this.value)" style="padding:4px; font-size:0.8rem; flex:1;">
+                             <option value="">-</option>
+                             <option value="Y" ${b.referral === 'Y' ? 'selected' : ''}>Y</option>
+                             <option value="N" ${b.referral === 'N' ? 'selected' : ''}>N</option>
+                         </select>
+                     </div>
+                 </div>
+                 ${dynamicFields}
+                 
+                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                     ${!inFollowUp ? `
+                         <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.startFollowUp('${b.id}')">🚶 متابعة</button>
+                     ` : `
+                         <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.finishFollowUp('${b.id}')">✅ انتهاء المهمة</button>
+                     `}
+                     <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.deletePCRow('${b.id}')">🗑️ حذف الملف</button>
+                 </div>
+             </div>
+         </div>
+        `;
+    },
 
     renderPostClinicBookings: async function() {
         this.title.textContent = 'حجوزات بعد العيادة';
@@ -1096,74 +1212,16 @@ Oncology Coordinator System`;
         tabsHTML += `</div>`;
 
         let activeData = data.filter(b => (b.providerName ? String(b.providerName).trim() : 'غير محدد') === this.activePCTab);
+        let newCasesList = await API.getNewCasesMeeting();
 
         let rows = activeData.map(b => {
-             let customData = {};
-             if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
+             // Check if registered in New Case Meeting
+             let isRegisteredInMeeting = newCasesList.some(m => 
+                (m.patientId === b.patientCode || m.patientName === b.patientName) && 
+                (m.sessionDate === b.sessionDate || m.sessionDate === window.globalArchiveDate)
+             );
 
-             let dynamicFields = this.pcCustomColumns.map(col => `
-                 <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; margin-bottom:4px;">
-                     <label style="font-size:0.8rem; color:var(--text-muted); font-weight:800; margin:0;">${col}</label>
-                     <input type="text" class="pc-input" value="${customData[col] || ''}" onchange="UI.updatePCRow('${b.id}', 'custom_${col}', this.value)" style="background:#fff; width:65%; padding:4px 6px; font-size:0.85rem;">
-                 </div>
-             `).join('');
-
-             return `
-             <div class="pc-dossier-card" id="tr-${b.id}" style="background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; min-width:300px; max-width: 100%;">
-                 <div class="dos-field" style="display:flex; flex-direction:column;">
-                     <label style="font-size:0.95rem; color:var(--primary); font-weight:900; margin-bottom:8px;">👤 Patient Name</label>
-                     <textarea class="pc-input pc-name-input" onchange="UI.updatePCRow('${b.id}', 'patientName', this.value)" style="resize:vertical; min-height:45px; height:45px; font-size:1.15rem; font-weight:800; color:#0f766e; background:#f0fdfa; border:2px solid #0d9488;" oninput="this.style.height=''; this.style.height=this.scrollHeight+'px'">${b.patientName || ''}</textarea>
-                 </div>
-                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                     <div style="display:flex; flex-direction:column;">
-                         <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Code</label>
-                         <input type="text" class="pc-input" value="${b.patientCode || ''}" onchange="UI.updatePCRow('${b.id}', 'patientCode', this.value)" style="font-family:monospace; font-weight:700;">
-                     </div>
-                     <div style="display:flex; flex-direction:column;">
-                         <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Age</label>
-                         <input type="text" class="pc-input" value="${b.patientAge || ''}" onchange="UI.updatePCRow('${b.id}', 'patientAge', this.value)" style="text-align:center;">
-                     </div>
-                 </div>
-                 <div style="display:flex; flex-direction:column;">
-                     <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Phone</label>
-                     <input type="text" class="pc-input" value="${b.phoneNumber || ''}" onchange="UI.updatePCRow('${b.id}', 'phoneNumber', this.value)" style="direction:ltr;">
-                 </div>
-                 <div style="display:flex; flex-direction:column;">
-                     <label style="font-size:0.95rem; color:#b45309; font-weight:900; margin-bottom:8px;">📋 Treatment Plan</label>
-                     <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'treatmentPlan', this.value)" style="resize:vertical; min-height:85px; width:100%; border:2px solid #f59e0b; background:#fffbeb; font-size:1.1rem; font-weight:600; color:#92400e; line-height:1.6;">${b.treatmentPlan || ''}</textarea>
-                 </div>
-                 <div style="display:flex; flex-direction:column; gap:12px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-top:auto;">
-                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
-                         <input type="checkbox" ${b.notifiedPatient === 'Y' ? 'checked' : ''} onchange="UI.updatePCRow('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')" style="transform:scale(1.2);">
-                         <strong style="color:var(--primary); font-size:0.9rem;">تم التبليغ ✅</strong>
-                     </label>
-                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                         <strong style="font-size:0.85rem; color:var(--text-muted);">OPC Appt:</strong>
-                         <input type="date" class="pc-input" style="padding:4px 6px; font-size:0.85rem; width:150px;" value="${b.opcDate || ''}" onchange="UI.updatePCRow('${b.id}', 'opcDate', this.value)">
-                     </div>
-                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                         <div style="display:flex; align-items:center; gap:4px;">
-                             <label style="margin:0; font-size:0.8rem; font-weight:800; color:var(--text-muted);">Permit:</label>
-                             <select class="pc-select ${b.permit === 'Y' ? 'yes' : b.permit === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'permit', this.value)" style="padding:4px; font-size:0.8rem; flex:1;">
-                                 <option value="">-</option>
-                                 <option value="Y" ${b.permit === 'Y' ? 'selected' : ''}>Y</option>
-                                 <option value="N" ${b.permit === 'N' ? 'selected' : ''}>N</option>
-                             </select>
-                         </div>
-                         <div style="display:flex; align-items:center; gap:4px;">
-                             <label style="margin:0; font-size:0.8rem; font-weight:800; color:var(--text-muted);">Referral:</label>
-                             <select class="pc-select ${b.referral === 'Y' ? 'yes' : b.referral === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'referral', this.value)" style="padding:4px; font-size:0.8rem; flex:1;">
-                                 <option value="">-</option>
-                                 <option value="Y" ${b.referral === 'Y' ? 'selected' : ''}>Y</option>
-                                 <option value="N" ${b.referral === 'N' ? 'selected' : ''}>N</option>
-                             </select>
-                         </div>
-                     </div>
-                     ${dynamicFields}
-                     <button class="btn btn-danger" style="margin-top:4px; padding:6px; width:100%; background:#fee2e2; color:#ef4444; border:none; font-weight:bold; border-radius:6px; cursor:pointer;" onclick="UI.deletePCRow('${b.id}')">🗑️ حذف الملف</button>
-                 </div>
-             </div>
-             `;
+             return this.getPCBookingCardHTML(b, isRegisteredInMeeting);
         }).join('');
 
         this.container.innerHTML = `
@@ -1177,7 +1235,8 @@ Oncology Coordinator System`;
                         <input type="file" id="excel-import" accept=".xlsx, .xls, .csv" style="display:none;" onchange="UI.handleExcelImport(event)">
                         <button class="btn btn-primary" style="background:#10b981; color:white; border:none; border-radius:8px; padding:10px 16px;" onclick="document.getElementById('excel-import').click()">📥 استيراد Excel</button>
                         <button class="btn btn-primary" style="border:1px solid var(--border); border-radius:8px; padding:10px 16px; background:#fff; color:var(--text);" onclick="UI.addPCColumn()">+ مساحة مخصصة</button>
-                        <button class="btn btn-primary" onclick="UI.printPostClinicTable()" style="background:#334155; border:none; border-radius:8px; padding:10px 16px; color:#fff;">🖨️ طباعة للجنة</button>
+                        <button class="btn btn-primary" onclick="UI.printPostClinicTable(false)" style="background:#334155; border:none; border-radius:8px; padding:10px 16px; color:#fff;" title="طباعة العيادة الحالية فقط">🖨️ طباعة للجنة</button>
+                        <button class="btn btn-primary" onclick="UI.printPostClinicTable(true)" style="background:#1e293b; border:none; border-radius:8px; padding:10px 16px; color:#fff;" title="طباعة كافة المرضى لجميع الأطباء في كشف واحد">🖨️ طباعة كافة العيادات</button>
                         ${this.activePCTab && this.activePCTab !== 'غير محدد' ? `<button class="btn btn-danger" onclick="UI.deleteProviderBookings('${this.activePCTab}')" style="background:#ef4444; color:white; border:none; border-radius:8px; padding:10px 16px;">🗑️ حذف ملفات د. ${this.activePCTab} لتاريخ ${window.globalArchiveDate}</button>` : ''}
                     </div>
                 </div>
@@ -1197,6 +1256,10 @@ Oncology Coordinator System`;
 
     updatePCRow: async function(id, field, value) {
         UI.showSaving();
+        
+        // Invalidate registry cache
+        this._masterRegistryCache = null;
+
         let allData = await API.getPostClinicBookings();
         let row = allData.find(r => r.id === id);
         if(!row) return;
@@ -1221,16 +1284,30 @@ Oncology Coordinator System`;
 
     deletePCRow: async function(id) {
         if(!confirm("هل أنت متأكد من حذف هذا الصف نهائياً؟")) return;
+        
+        // Invalidate registry cache
+        this._masterRegistryCache = null;
+
         let tr = document.getElementById('tr-' + id);
         if(tr) tr.style.opacity = '0.3';
         
-        await API.deletePostClinicBooking(id);
-        UI.renderPostClinicBookings();
+        try {
+            await API.deletePostClinicBooking(id);
+            UI.showToast("تم حذف الملف بنجاح ✅");
+            UI.renderPostClinicBookings();
+        } catch(err) {
+            console.error(err);
+            if(tr) tr.style.opacity = '1';
+            UI.showToast("فشل الحذف — تحقق من اتصال قاعدة البيانات", "error");
+        }
     },
 
     deleteProviderBookings: async function(providerName) {
         if(!confirm(`هل أنت متأكد من مسح كافة بيانات د. ${providerName} لتاريخ ${window.globalArchiveDate}؟`)) return;
         
+        // Invalidate registry cache
+        this._masterRegistryCache = null;
+
         UI.container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p style="margin-top:20px; font-weight:bold; color:var(--danger);">جاري المسح. يرجى الانتظار...</p></div>';
         
         try {
@@ -1246,14 +1323,102 @@ Oncology Coordinator System`;
     },
 
     addPostClinicRow: function() {
-        let newData = {
-            id: 'PC' + new Date().getTime(),
-            patientName: '', patientCode: '', patientAge: '', providerName: '', sessionDate: window.globalArchiveDate,
-            treatmentPlan: '', opcDate: '', phoneNumber: '', permit: '', referral: '', notifiedPatient: '', sessionDate: window.globalArchiveDate, customData: ''
-        };
-        // Optimistic UI update: fire and forget background sync
-        API.createPostClinicBooking(newData).catch(() => UI.showToast("خطأ في المزامنة", "error"));
-        UI.renderPostClinicBookings(); // renders instantly from updated cache
+        let formHTML = `
+            <div style="padding:10px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div style="grid-column: span 2;">
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">👤 اسم المريض الكامل</label>
+                    <input type="text" id="pc-new-name" placeholder="مثال: يوسف كمال" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+                
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">🔢 رقم الملف (MRN)</label>
+                    <input type="text" id="pc-new-code" placeholder="مثال: 12345" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">🎂 العمر</label>
+                    <input type="text" id="pc-new-age" placeholder="مثال: 45" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">📞 رقم الهاتف</label>
+                    <input type="text" id="pc-new-phone" placeholder="05x-xxxxxxx" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; direction:ltr;">
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">👨‍⚕️ اسم الطبيب (التبويب)</label>
+                    <input type="text" id="pc-new-provider" placeholder="مثال: د. ياسين أبو الهوى" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;" value="${this.activePCTab && this.activePCTab !== 'غير محدد' ? this.activePCTab : ''}">
+                </div>
+
+                <div style="grid-column: span 2;">
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">📋 خطة العلاج (Treatment Plan)</label>
+                    <textarea id="pc-new-plan" style="width:100%; height:80px; padding:10px; border:1px solid #ddd; border-radius:8px;"></textarea>
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">📅 موعد العيادة القادم</label>
+                    <input type="date" id="pc-new-opc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div style="display:flex; gap:10px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="font-weight:bold; margin-bottom:8px; display:block;">Permit</label>
+                        <select id="pc-new-permit" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                            <option value="">-</option>
+                            <option value="Y">Y</option>
+                            <option value="N">N</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-weight:bold; margin-bottom:8px; display:block;">Referral</label>
+                        <select id="pc-new-referral" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                            <option value="">-</option>
+                            <option value="Y">Y</option>
+                            <option value="N">N</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.showModal('إضافة ملف مريض كامل', formHTML, async () => {
+             // Invalidate registry cache
+             this._masterRegistryCache = null;
+
+             let pName = document.getElementById('pc-new-name').value.trim();
+             let pProvider = document.getElementById('pc-new-provider').value.trim() || 'غير محدد';
+             
+             if(!pName) { UI.showToast("يجب إدخال اسم المريض", "error"); return; }
+
+             let newData = {
+                id: 'PC' + new Date().getTime(),
+                patientName: pName, 
+                patientCode: document.getElementById('pc-new-code').value.trim(), 
+                patientAge: document.getElementById('pc-new-age').value.trim(), 
+                providerName: pProvider, 
+                sessionDate: window.globalArchiveDate,
+                treatmentPlan: document.getElementById('pc-new-plan').value.trim(), 
+                opcDate: document.getElementById('pc-new-opc').value, 
+                phoneNumber: document.getElementById('pc-new-phone').value.trim(), 
+                permit: document.getElementById('pc-new-permit').value, 
+                referral: document.getElementById('pc-new-referral').value, 
+                notifiedPatient: 'N', 
+                customData: ''
+            };
+
+            UI.showSaving();
+            try {
+                await API.createPostClinicBooking(newData);
+                document.getElementById('app-modal').remove();
+                
+                // Switch to the new provider tab and re-render
+                UI.activePCTab = pProvider;
+                UI.renderPostClinicBookings();
+                UI.showToast("تم إضافة المريض بكامل بياناته بنجاح.");
+            } catch(e) {
+                UI.showToast("فشل الحفظ في قاعدة البيانات", "error");
+            }
+        });
     },
 
     addPCColumn: function() {
@@ -1270,6 +1435,9 @@ Oncology Coordinator System`;
     handleExcelImport: async function(event) {
         let file = event.target.files[0];
         if(!file) return;
+
+        // Invalidate registry cache
+        this._masterRegistryCache = null;
 
         UI.showToast("جاري تحليل ومزامنة ملف الإكسل السحابي... يرجى الانتظار", "success");
         
@@ -1376,6 +1544,7 @@ Oncology Coordinator System`;
                 }
 
                 if (newBookingsArray.length > 0) {
+                    UI._masterRegistryCache = null; // Invalidate cache
                     await API.createBatchPostClinicBookings(newBookingsArray);
                 }
                 UI.showToast(`تم اكتشاف واستيراد ${newBookingsArray.length} مريض بنجاح! 🎉`);
@@ -1391,11 +1560,19 @@ Oncology Coordinator System`;
     }
 
     ,
-    printPostClinicTable: async function() {
+    printPostClinicTable: async function(printAll = false) {
         let allData = await API.getPostClinicBookings();
         let fallbackToday = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
         let sessionData = allData.filter(b => b.sessionDate === window.globalArchiveDate || (!b.sessionDate && window.globalArchiveDate === fallbackToday));
-        let data = this.activePCTab ? sessionData.filter(b => (b.providerName ? String(b.providerName).trim() : 'غير محدد') === this.activePCTab) : sessionData;
+        
+        let data = [];
+        if (printAll) {
+            data = sessionData;
+        } else {
+            data = this.activePCTab && this.activePCTab !== 'غير محدد' 
+                ? sessionData.filter(b => (b.providerName ? String(b.providerName).trim() : 'غير محدد') === this.activePCTab) 
+                : sessionData;
+        }
         
         if(!data || data.length === 0) {
             UI.showToast("لا يوجد بيانات للطباعة في هذه القائمة", "error");
@@ -1563,10 +1740,12 @@ Oncology Coordinator System`;
         
         try {
             await API.deleteNewCaseMeeting(id);
-            UI.showToast("تم الحذف بنجاح");
+            UI.showToast("تم حذف الحالة بنجاح ✅");
             UI.renderNewCasesMeeting();
         } catch(err) {
-            UI.showToast("فشل في مسح البيانات", "error");
+            console.error(err);
+            if(tr) tr.style.opacity = '1';
+            UI.showToast("فشل الحذف — تحقق من اتصال قاعدة البيانات", "error");
         }
     },
 
@@ -1854,9 +2033,216 @@ Oncology Coordinator System`;
         if(prev) { prev.src = ''; prev.style.display = 'none'; }
         if(btn) btn.style.display = 'none';
         UI.showToast('تم حذف الشعار');
-    }
+    },
 
-    ,
+    buildNCStatsBar: function(data) {
+        const total = data.length;
+        const withHistory = data.filter(d => d.briefHistory && d.briefHistory.trim() !== '').length;
+        const withPlan = data.filter(d => d.treatmentPlan && d.treatmentPlan.trim() !== '').length;
+        const withNotes = data.filter(d => d.notes && d.notes.trim() !== '').length;
+
+        setTimeout(() => UI.animateCounters(), 100);
+
+        return `
+        <div class="session-stats-bar no-print">
+            <div class="stat-chip">
+                <span>📁 إجمالي الحالات</span>
+                <span class="stat-value" data-target="${total}">0</span>
+            </div>
+            <div class="stat-chip">
+                <span>📖 لديهم تاريخ طبي</span>
+                <span class="stat-value" data-target="${withHistory}" style="color:#1d4ed8;">0</span>
+            </div>
+            <div class="stat-chip">
+                <span>📋 لديهم خطة علاج</span>
+                <span class="stat-value" data-target="${withPlan}" style="color:#b45309;">0</span>
+            </div>
+            <div class="stat-chip">
+                <span>📝 لديهم ملاحظات</span>
+                <span class="stat-value" data-target="${withNotes}">0</span>
+            </div>
+        </div>`;
+    },
+
+    masterRegistrySearchQuery: '',
+    masterRegistryActiveTab: 'ALL',
+    visibleRegistryColumns: ['treatmentPlan'], // default visible detailed columns
+    _masterRegistryCache: null, // internal cache to prevent flicker on search
+
+    renderMasterRegistry: async function() {
+        this.title.textContent = 'السجل التاريخي الشامل للعيادات';
+        
+        let allData = [];
+        if (this._masterRegistryCache) {
+            allData = this._masterRegistryCache;
+        } else {
+            this.container.innerHTML = this.renderSkeleton(10);
+            allData = await API.getPostClinicBookings();
+            this._masterRegistryCache = allData;
+        }
+
+        let query = this.masterRegistrySearchQuery.toLowerCase().trim();
+        
+        // Filter by Search Query
+        let filtered = allData.filter(b => 
+            String(b.patientName || '').toLowerCase().includes(query) || 
+            String(b.patientCode || '').includes(query) ||
+            String(b.treatmentPlan || '').toLowerCase().includes(query)
+        );
+
+        // Sort: Newest First
+        filtered.sort((a,b) => new Date(b.sessionDate || 0) - new Date(a.sessionDate || 0));
+
+        // Get unique providers for tabs
+        let providers = [...new Set(allData.map(d => d.providerName ? String(d.providerName).trim() : 'غير محدد'))]
+                        .filter(p => p !== '');
+        
+        // Tabs HTML
+        let tabsHTML = `<div class="pc-tabs" style="display:flex; gap:8px; margin-bottom:20px; overflow-x:auto; padding-bottom:8px;">`;
+        let tabItems = ['ALL', ...providers];
+        tabItems.forEach(tab => {
+            let isActive = tab === this.masterRegistryActiveTab;
+            let label = tab === 'ALL' ? 'الكل' : `د. ${tab}`;
+            let count = tab === 'ALL' ? filtered.length : filtered.filter(b => (b.providerName || 'غير محدد') === tab).length;
+            
+            tabsHTML += `
+                <button onclick="UI.masterRegistryActiveTab='${tab}'; UI.renderMasterRegistry();" 
+                        style="padding:8px 16px; border-radius:20px; border:2px solid; cursor:pointer; font-weight:700; white-space:nowrap;
+                               ${isActive ? 'background:var(--primary); color:white; border-color:var(--primary);' : 'background:#fff; color:var(--text-muted); border-color:#e2e8f0;'}">
+                    ${label} <span style="font-size:0.8rem; margin-right:6px; opacity:0.8;">(${count})</span>
+                </button>`;
+        });
+        tabsHTML += `</div>`;
+
+        // Column Chooser HTML
+        let colChooserHTML = `
+            <div style="background:#f8fafc; padding:12px; border-radius:12px; margin-bottom:20px; border:1px solid #e2e8f0;">
+                <label style="font-weight:800; font-size:0.9rem; margin-bottom:8px; display:block; color:var(--primary);">👁️ مُنتقي الأعمدة الإضافية:</label>
+                <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:0.9rem;">
+                        <input type="checkbox" ${this.visibleRegistryColumns.includes('treatmentPlan') ? 'checked' : ''} onchange="UI.toggleRegistryColumn('treatmentPlan')"> خطة العلاج
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:0.9rem;">
+                        <input type="checkbox" ${this.visibleRegistryColumns.includes('opcDate') ? 'checked' : ''} onchange="UI.toggleRegistryColumn('opcDate')"> موعد العيادة القادم
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:0.9rem;">
+                        <input type="checkbox" ${this.visibleRegistryColumns.includes('phone') ? 'checked' : ''} onchange="UI.toggleRegistryColumn('phone')"> الهاتف
+                    </label>
+                </div>
+            </div>
+        `;
+
+        // Filter by Tab
+        let tabData = this.masterRegistryActiveTab === 'ALL' 
+            ? filtered 
+            : filtered.filter(b => (b.providerName || 'غير محدد') === this.masterRegistryActiveTab);
+
+        let tableRows = tabData.map(b => `
+            <tr style="cursor:pointer; transition:background 0.2s;" onclick="UI.openDossierModal('${b.id}')" onmouseover="this.style.background='#f0fdfa'" onmouseout="this.style.background='white'">
+                <td style="font-weight:800; color:var(--primary);">${b.patientName || 'بدون اسم'}</td>
+                <td><span style="background:#f1f5f9; padding:2px 8px; border-radius:6px; font-family:monospace; font-weight:700;">${b.patientCode || '---'}</span></td>
+                <td>${b.providerName || 'غير محدد'}</td>
+                <td style="color:var(--text-muted); font-size:0.85rem;">${b.sessionDate || '---'}</td>
+                ${this.visibleRegistryColumns.includes('treatmentPlan') ? `<td style="max-width:300px; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${b.treatmentPlan || ''}">${b.treatmentPlan || '---'}</td>` : ''}
+                ${this.visibleRegistryColumns.includes('opcDate') ? `<td>${b.opcDate || '---'}</td>` : ''}
+                ${this.visibleRegistryColumns.includes('phone') ? `<td>${b.phoneNumber || '---'}</td>` : ''}
+            </tr>
+        `).join('');
+
+        this.container.innerHTML = `
+            <div class="card">
+                <div style="margin-bottom:24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h3>سجل العيادات العام الحصري</h3>
+                        <div style="position:relative; width:350px;">
+                            <input type="text" id="registry-search" value="${this.masterRegistrySearchQuery}" 
+                                   placeholder="ابحث بالاسم، رقم الملف، أو الخطة..." 
+                                   oninput="UI.masterRegistrySearchQuery=this.value; UI.renderMasterRegistry()"
+                                   style="width:100%; padding:10px 40px 10px 12px; border-radius:12px; border:1px solid #cbd5e1; outline:none; font-weight:700;">
+                            <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:1.2rem;">🔍</span>
+                        </div>
+                    </div>
+                    ${tabsHTML}
+                    ${colChooserHTML}
+                </div>
+                
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>اسم المريض</th>
+                                <th>رقم الملف (MRN)</th>
+                                <th>الدكتور المتابع</th>
+                                <th>تاريخ الجلسة</th>
+                                ${this.visibleRegistryColumns.includes('treatmentPlan') ? '<th>خطة العلاج</th>' : ''}
+                                ${this.visibleRegistryColumns.includes('opcDate') ? '<th>موعد العيادة</th>' : ''}
+                                ${this.visibleRegistryColumns.includes('phone') ? '<th>الهاتف</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tabData.length > 0 ? tableRows : '<tr><td colspan="10" style="text-align:center; padding:40px; color:var(--text-muted);">لا يوجد نتائج مطابقة للبحث.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        // Focus search if it was active
+        const searchInput = document.getElementById('registry-search');
+        if (searchInput && query) {
+            searchInput.focus();
+            searchInput.setSelectionRange(query.length, query.length);
+        }
+    },
+
+    toggleRegistryColumn: function(colId) {
+        if(this.visibleRegistryColumns.includes(colId)) {
+            this.visibleRegistryColumns = this.visibleRegistryColumns.filter(c => c !== colId);
+        } else {
+            this.visibleRegistryColumns.push(colId);
+        }
+        this.renderMasterRegistry();
+    },
+
+    openDossierModal: async function(bookingId) {
+        let allData = await API.getPostClinicBookings();
+        let b = allData.find(r => r.id === bookingId);
+        if(!b) return;
+
+        let newCasesList = await API.getNewCasesMeeting();
+        let isRegistered = newCasesList.some(m => 
+            (m.patientId === b.patientCode || m.patientName === b.patientName) && 
+            (m.sessionDate === b.sessionDate || m.sessionDate === window.globalArchiveDate)
+        );
+
+        let cardHTML = this.getPCBookingCardHTML(b, isRegistered);
+        
+        this.showModal(`استعراض ملف المريض: ${b.patientName}`, `
+            <div style="max-height:80vh; overflow-y:auto; padding:5px;">
+                <div style="display:flex; justify-content:center;">
+                    <div style="width:100%; max-width:500px;">
+                        ${cardHTML}
+                    </div>
+                </div>
+            </div>
+        `, async () => {
+             // Saving is handled by the cards themselves via updatePCRow
+             document.getElementById('app-modal').remove();
+             UI.renderMasterRegistry(); // refresh list to reflect changes
+        });
+    },
+
+    removeLogo: function() {
+        const saved = JSON.parse(localStorage.getItem('appSettings') || '{}');
+        delete saved.logoDataUrl;
+        localStorage.setItem('appSettings', JSON.stringify(saved));
+        const prev = document.getElementById('logo-preview');
+        const btn = document.getElementById('logo-remove-btn');
+        if(prev) { prev.src = ''; prev.style.display = 'none'; }
+        if(btn) btn.style.display = 'none';
+        UI.showToast('تم حذف الشعار');
+    },
+
     // ============================================
     //   FEATURE PACK: Dark Mode, Skeleton, Save Indicator, Stats
     // ============================================
@@ -1998,10 +2384,336 @@ Oncology Coordinator System`;
                 <span class="stat-value" data-target="${withNotes}">0</span>
             </div>
         </div>`;
+    },
+    // ============================================
+    //   FOLLOW-UP FEATURE 🚶
+    // ============================================
+    renderFollowUpView: async function() {
+        this.title.textContent = 'قسم متابعة المرضى';
+        this.container.innerHTML = this.renderSkeleton(5);
+
+        const allData = await API.getPostClinicBookings();
+        const followUps = allData.filter(b => b.followUpStatus === 'ACTIVE');
+        
+        // Sorting: Oldest First (to prioritize cases waiting longest)
+        followUps.sort((a,b) => new Date(a.sessionDate || 0) - new Date(b.sessionDate || 0));
+
+        let query = (this.followUpSearchQuery || '').toLowerCase().trim();
+        let filtered = followUps.filter(b => 
+            String(b.patientName || '').toLowerCase().includes(query) || 
+            String(b.patientCode || '').includes(query) || 
+            String(b.followUpNotes || '').toLowerCase().includes(query) ||
+            String(b.providerName || '').toLowerCase().includes(query)
+        );
+
+        let tableRows = filtered.map(b => `
+            <tr style="transition:background 0.2s;" onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='white'">
+                <td style="padding:15px; border-bottom:1px solid #f1f5f9;">
+                    <div style="font-weight:900; color:var(--primary);">${b.patientName || 'بدون اسم'}</div>
+                    <div style="color:var(--text-muted); font-size:0.8rem; font-family:monospace;">${b.patientCode || '---'}</div>
+                </td>
+                <td style="padding:15px; border-bottom:1px solid #f1f5f9; font-weight:700; color:#334155;">د. ${b.providerName || 'غير محدد'}</td>
+                <td style="padding:15px; border-bottom:1px solid #f1f5f9;">
+                    <div style="background:#fffbeb; color:#92400e; padding:8px 12px; border-radius:8px; border-right:4px solid #f59e0b; font-size:0.9rem; max-width:400px;">
+                        ${b.followUpNotes || 'لا توجد ملاحظات'}
+                    </div>
+                </td>
+                <td style="padding:15px; border-bottom:1px solid #f1f5f9; font-size:0.85rem; color:#64748b;">${b.sessionDate || '---'}</td>
+                <td style="padding:15px; border-bottom:1px solid #f1f5f9; text-align:left;">
+                    <div style="display:flex; gap:8px; justify-content:flex-end;">
+                        <button class="btn btn-primary" style="padding:6px 12px; font-size:0.85rem; background:#0f766e;" onclick="UI.openDossierModal('${b.id}')">👁️ عرض</button>
+                        <button class="btn" style="padding:6px 12px; font-size:0.85rem; background:#f0fdf4; color:#15803d; border:1px solid #86efac;" onclick="UI.finishFollowUp('${b.id}')">✅ إنهاء</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        this.container.innerHTML = `
+            <div class="card animate-fade" style="padding:0; overflow:hidden; border-radius:15px; box-shadow:var(--shadow-lg);">
+                <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; background:#fff; padding:25px; border-bottom:1px solid #f1f5f9;">
+                    <div>
+                        <h3 style="margin:0; color:#92400e; display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:1.8rem;">🚶</span> سجل مهام المتابعة النشطة
+                        </h3>
+                        <p style="color:var(--text-muted); font-size:0.9rem; margin:6px 0 0 0;">إدارة الحالات العالقة التي تتطلب إجراءات إضافية (الترتيب: الأقدم أولاً).</p>
+                    </div>
+                    <div style="position:relative; width:350px;">
+                        <input type="text" value="${this.followUpSearchQuery || ''}" 
+                               placeholder="بحث باسم المريض أو المهمة..." 
+                               oninput="UI.followUpSearchQuery=this.value; UI.renderFollowUpView()"
+                               style="width:100%; padding:12px 45px 12px 15px; border-radius:12px; border:2px solid #fdba74; outline:none; font-weight:700; transition: border-color 0.3s;"
+                               onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='#fdba74'">
+                        <span style="position:absolute; right:15px; top:50%; transform:translateY(-50%); font-size:1.2rem; opacity:0.6;">🔍</span>
+                    </div>
+                </div>
+
+                <div class="session-stats-bar" style="border-radius:0; margin:0; padding:15px 25px; background:#f8fafc; border-bottom:1px solid #f1f5f9;">
+                    <div class="stat-chip">
+                        <span>📋 إجمالي المتابعات المعلقة</span>
+                        <span class="stat-value" data-target="${followUps.length}">${followUps.length}</span>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; min-width:800px;">
+                        <thead>
+                            <tr style="background:#f8fafc; color:var(--text-muted); text-align:right; font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">
+                                <th style="padding:15px; font-weight:900;">المريض / الكود</th>
+                                <th style="padding:15px; font-weight:900;">الطبيب</th>
+                                <th style="padding:15px; font-weight:900;">مهمة المتابعة المطلوب تنفيذها</th>
+                                <th style="padding:15px; font-weight:900;">تاريخ الجلسة</th>
+                                <th style="padding:15px; font-weight:900; text-align:left;">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filtered.length > 0 ? tableRows : `
+                                <tr>
+                                    <td colspan="5" style="text-align:center; padding:80px; color:#92400e; background:#fffbeb;">
+                                        <div style="font-size:3rem; margin-bottom:15px;">🎉</div>
+                                        <div style="font-weight:900; font-size:1.2rem;">لا توجد متابعات عالقة حالياً!</div>
+                                        <div style="font-size:0.9rem; opacity:0.8;">كافة المهام تم إنجازها بنجاح.</div>
+                                    </td>
+                                </tr>
+                            `}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        UI.animateCounters();
+    },
+
+    startFollowUp: function(id) {
+        const note = prompt("ما هي المتابعة المطلوبة لهذا المريض؟ (مثال: حجز موعد خزعة، اتصال بالأهل...)");
+        if (note === null) return; 
+
+        this._updateFollowUp(id, 'ACTIVE', note);
+    },
+
+    finishFollowUp: async function(id) {
+        const note = prompt("ماذا فعلت مع المريض لإغلاق هذه المهمة؟\n(سيتم تسجيل هذا النص في خطة العلاج بلون مختلف)");
+        if (note === null) return; 
+
+        UI.showSaving();
+        
+        let allData = await API.getPostClinicBookings();
+        let row = allData.find(r => r.id === id);
+        if(!row) return;
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+        
+        // Append to Treatment Plan with specific formatting and blue color for tasks
+        const currentPlan = row.treatmentPlan || "";
+        const followUpEntry = `\n<div style="color:#0369a1; font-weight:bold; margin-top:12px; border-top:1px dashed #bae6fd; padding-top:12px; font-size:0.95rem;">✅ تم إنهاء المهمة (${dateStr}):<br>${note}</div>`;
+        row.treatmentPlan = currentPlan + followUpEntry;
+        
+        row.followUpStatus = 'FINISHED';
+        row.followUpNotes = null;
+
+        this._masterRegistryCache = null;
+        await API.updatePostClinicBooking(row);
+        
+        UI.showToast("تم توثيق الإجراء وإغلاق المهمة بنجاح ✅");
+        
+        const route = document.querySelector('.nav-links li.active')?.getAttribute('data-route');
+        if (route === 'follow-up') UI.renderFollowUpView();
+        else if (route === 'post-clinic') UI.renderPostClinicBookings();
+    },
+
+    _updateFollowUp: async function(id, status, notes) {
+        UI.showSaving();
+        
+        let allData = await API.getPostClinicBookings();
+        let row = allData.find(r => r.id === id);
+        if(!row) return;
+
+        row.followUpStatus = status;
+        if (notes !== null) row.followUpNotes = notes;
+
+        this._masterRegistryCache = null;
+        await API.updatePostClinicBooking(row);
+        
+        UI.showToast(status === 'ACTIVE' ? "تم النقل لقسم المتابعة 🚶" : "تم إنهاء المهمة بنجاح ✅");
+        
+        const route = document.querySelector('.nav-links li.active')?.getAttribute('data-route');
+        if (route === 'follow-up') UI.renderFollowUpView();
+        else if (route === 'post-clinic') UI.renderPostClinicBookings();
+        else if (route === 'master-registry') UI.renderMasterRegistry();
+    },
+
+    forceFullSync: async function() {
+        if (!confirm("هل تريد تحديث كافة البيانات من السيرفر الآن؟ سيتم مسح الذاكرة المؤقتة وإعادة التحميل.")) return;
+        
+        this.showSaving();
+        API.clearCache();
+        await API.initSync(true); // force true
+        
+        UI.showToast("تم تحديث البيانات بنجاح 🔄");
+        // Re-render current view
+        const route = document.querySelector('.nav-links li.active')?.getAttribute('data-route') || 'dashboard';
+        UI.renderByRoute(route);
+    },
+
+    // ============================================
+    //   REPORTS & ANALYTICS 📊
+    // ============================================
+    renderReports: async function() {
+        this.title.textContent = 'التقارير والإحصائيات التحليلية';
+        this.container.innerHTML = this.renderSkeleton(4);
+
+        const allPC = await API.getPostClinicBookings();
+        const allMeetings = await API.getNewCasesMeeting();
+        const activeFollowUps = allPC.filter(b => b.followUpStatus === 'ACTIVE');
+
+        // Prepare Stats
+        const providerData = {};
+        allPC.forEach(p => {
+            const name = p.providerName || 'غير محدد';
+            providerData[name] = (providerData[name] || 0) + 1;
+        });
+
+        // Group by Month/Year for trends
+        const monthlyTrends = {};
+        allPC.forEach(p => {
+            const dateStr = p.sessionDate || '1970-01-01';
+            const month = dateStr.substring(0, 7); // yyyy-mm
+            monthlyTrends[month] = (monthlyTrends[month] || 0) + 1;
+        });
+        const sortedMonths = Object.keys(monthlyTrends).sort();
+
+        this.container.innerHTML = `
+            <div class="reports-dashboard animate-fade" style="padding-bottom:50px;">
+                <!-- Section 1: KPI Cards -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:20px; margin-bottom:30px;">
+                    <div class="stat-card" style="background:linear-gradient(135deg, #0f766e, #14b8a6); color:white; padding:24px; border-radius:15px; box-shadow:0 10px 15px -3px rgba(15,118,110,0.2);">
+                        <div style="font-size:0.9rem; opacity:0.9;">👥 إجمالي المرضى المسجلين</div>
+                        <div style="font-size:2.5rem; font-weight:800; margin-top:10px;">${allPC.length}</div>
+                        <div style="margin-top:10px; font-size:0.8rem;">سجل منذ بدء استخدام المنظومة</div>
+                    </div>
+                    <div class="stat-card" style="background:linear-gradient(135deg, #b45309, #f59e0b); color:white; padding:24px; border-radius:15px; box-shadow:0 10px 15px -3px rgba(180,83,9,0.2);">
+                        <div style="font-size:0.9rem; opacity:0.9;">🚶 متابعات نشطة</div>
+                        <div style="font-size:2.5rem; font-weight:800; margin-top:10px;">${activeFollowUps.length}</div>
+                        <div style="margin-top:10px; font-size:0.8rem;">حالات تتطلب تنسيق حالياً</div>
+                    </div>
+                    <div class="stat-card" style="background:linear-gradient(135deg, #1e293b, #475569); color:white; padding:24px; border-radius:15px; box-shadow:0 10px 15px -3px rgba(30,41,59,0.2);">
+                        <div style="font-size:0.9rem; opacity:0.9;">📁 لجان الحالات الجديدة</div>
+                        <div style="font-size:2.5rem; font-weight:800; margin-top:10px;">${allMeetings.length}</div>
+                        <div style="margin-top:10px; font-size:0.8rem;">إجمالي الملفات المعروضة</div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Charts -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap:25px; margin-bottom:30px;">
+                    <div class="card" style="background:#fff; padding:25px; border-radius:15px;">
+                        <h4 style="margin-bottom:20px; color:var(--primary); font-weight:800; border-bottom:2px solid #f1f5f9; padding-bottom:10px;">🩺 توزيع الحالات حسب الطبيب</h4>
+                        <canvas id="providerChart" style="max-height:300px;"></canvas>
+                    </div>
+                    <div class="card" style="background:#fff; padding:25px; border-radius:15px;">
+                        <h4 style="margin-bottom:20px; color:var(--primary); font-weight:800; border-bottom:2px solid #f1f5f9; padding-bottom:10px;">📅 تدفق المرضى شهرياً</h4>
+                        <canvas id="trendChart" style="max-height:300px;"></canvas>
+                    </div>
+                </div>
+
+                <!-- Section 3: Detailed Stats -->
+                <div class="card" style="background:#fff; padding:25px; border-radius:15px;">
+                    <h4 style="margin-bottom:20px; color:var(--primary); font-weight:800;">📊 ملخص أداء العيادات</h4>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="text-align:right; border-bottom:2px solid #f1f5f9; color:var(--text-muted);">
+                                <th style="padding:15px;">الطبيب المعالج</th>
+                                <th style="padding:15px;">عدد الحالات</th>
+                                <th style="padding:15px;">النسبة المئوية</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(providerData).sort((a,b) => b[1] - a[1]).map(([name, count]) => `
+                                <tr style="border-bottom:1px solid #f8fafc;">
+                                    <td style="padding:15px; font-weight:700;">د. ${name}</td>
+                                    <td style="padding:15px;">${count} مريض</td>
+                                    <td style="padding:15px;">
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <div style="flex:1; background:#f1f5f9; height:8px; border-radius:4px; overflow:hidden;">
+                                                <div style="width:${(count/allPC.length*100).toFixed(1)}%; background:var(--primary); height:100%;"></div>
+                                            </div>
+                                            <span style="font-size:0.85rem; color:var(--text-muted);">${(count/allPC.length*100).toFixed(1)}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top:30px; text-align:center;">
+                    <button class="btn btn-primary" onclick="window.print()" style="padding:12px 30px; font-size:1rem; border-radius:30px;">🖨️ تصدير التقرير التحليلي</button>
+                </div>
+            </div>
+        `;
+
+        // Wait for DOM to render then init charts
+        setTimeout(() => {
+            this._initCharts(providerData, sortedMonths, monthlyTrends);
+        }, 100);
+    },
+
+    _initCharts: function(providerData, sortedMonths, monthlyTrends) {
+        // 1. Provider Pie Chart
+        const providerCtx = document.getElementById('providerChart').getContext('2d');
+        new Chart(providerCtx, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(providerData),
+                datasets: [{
+                    data: Object.values(providerData),
+                    backgroundColor: ['#0f766e', '#14b8a6', '#0d9488', '#2dd4bf', '#5eead4', '#99f6e4', '#ccfbf1'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { font: { family: 'Cairo', weight: 'bold' } } } }
+            }
+        });
+
+        // 2. Trend Line Chart
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: sortedMonths.map(m => {
+                    const [y, mm] = m.split('-');
+                    const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+                    return monthsAr[parseInt(mm)-1] + ' ' + y;
+                }),
+                datasets: [{
+                    label: 'عدد المرضى',
+                    data: sortedMonths.map(m => monthlyTrends[m]),
+                    borderColor: '#0f766e',
+                    backgroundColor: 'rgba(15, 118, 110, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 6,
+                    pointBackgroundColor: '#0f766e'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, font: { family: 'Cairo' } } },
+                    x: { ticks: { font: { family: 'Cairo' } } }
+                }
+            }
+        });
     }
 };
 
 // END OF UI.JS
+
+
 
 
 

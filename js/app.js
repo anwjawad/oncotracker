@@ -68,6 +68,15 @@ document.addEventListener("DOMContentLoaded", () => {
             case 'post-clinic':
                 UI.renderPostClinicBookings();
                 break;
+            case 'master-registry':
+                UI.renderMasterRegistry();
+                break;
+            case 'follow-up':
+                UI.renderFollowUpView();
+                break;
+            case 'reports':
+                UI.renderReports();
+                break;
             case 'new-cases':
                 UI.renderNewCasesMeeting();
                 break;

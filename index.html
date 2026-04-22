@@ -18,6 +18,8 @@
     <link rel="stylesheet" href="css/style.css">
     <!-- Feature Pack CSS -->
     <link rel="stylesheet" href="css/features.css">
+    <!-- Charts Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Visual WOW CSS -->
     <link rel="stylesheet" href="css/visual_wow.css">
     <!-- SheetJS for Excel Parsing -->
@@ -95,6 +97,19 @@
                 </li>
                 <li data-route="post-clinic">
                     <span class="icon">🏥</span> <span class="nav-text">حجوزات بعد العيادة</span>
+                </li>
+                <li data-route="master-registry">
+                    <span class="icon">🏛️</span> <span class="nav-text">السجل التاريخي الشامل</span>
+                </li>
+                <li data-route="follow-up">
+                    <span class="icon">🚶</span> <span class="nav-text">قسم المتابعة</span>
+                </li>
+                <li data-route="reports">
+                    <span class="icon">📊</span> <span class="nav-text">التقارير</span>
+                </li>
+                
+                <li onclick="UI.forceFullSync()" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; cursor: pointer; background: rgba(255,255,255,0.05);">
+                    <span class="icon">🔄</span> <span class="nav-text" style="color: #94a3b8;">تحديث كامل للبيانات</span>
                 </li>
                 <li style="display: none;" data-route="bulk-actions" style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
                     <span class="icon">⚡</span> <span class="nav-text">مركز المهام السريعة</span>

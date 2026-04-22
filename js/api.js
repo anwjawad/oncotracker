@@ -3,10 +3,39 @@
 // ============================================
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwSNo0whdJGYjDDcIKsq-MVVIKeG6w47E1sDnIJkE6iQmHFIq-afFuVlikwqSG6OTWxJA/exec"; 
+const _LOCAL_KEY = "ONCOLOGY_SYNC_CACHE";
 
 const API = {
     _cache: null,
     _syncPromise: null,
+    _isSyncing: false,
+
+    persistCache: function() {
+        if (this._cache) {
+            localStorage.setItem(_LOCAL_KEY, JSON.stringify({
+                data: this._cache,
+                timestamp: new Date().getTime()
+            }));
+        }
+    },
+
+    loadCache: function() {
+        const stored = localStorage.getItem(_LOCAL_KEY);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                this._cache = parsed.data;
+                return true;
+            } catch (e) { return false; }
+        }
+        return false;
+    },
+
+    clearCache: function() {
+        localStorage.removeItem(_LOCAL_KEY);
+        this._cache = null;
+        this._syncPromise = null;
+    },
 
     _fetchGAS: async function(action, payload = {}) {
         if (!GAS_URL || GAS_URL === "YOUR_WEB_APP_URL_HERE") {
@@ -31,14 +60,51 @@ const API = {
     },
 
     initSync: async function(force = false) {
-        if (this._cache && !force) return this._cache;
+        // Fast Load: Prefer Cache if available
+        if (!this._cache && !force) {
+            this.loadCache();
+        }
+
+        if (this._cache && !force) {
+            // If we have cache, trigger a background sync silently
+            this._backgroundSync();
+            return this._cache;
+        }
+
         if (!this._syncPromise || force) {
             this._syncPromise = this._fetchGAS('SYNC_ALL').then(data => {
-                if(data) this._cache = data;
+                if(data) {
+                    this._cache = data;
+                    this.persistCache();
+                }
                 return this._cache;
             });
         }
         return await this._syncPromise;
+    },
+
+    _backgroundSync: async function() {
+        if (this._isSyncing) return;
+        this._isSyncing = true;
+        try {
+            const data = await this._fetchGAS('SYNC_ALL');
+            if (data) {
+                // Check if data actually changed to avoid unnecessary re-renders
+                const dataChanged = JSON.stringify(this._cache) !== JSON.stringify(data);
+                this._cache = data;
+                this.persistCache();
+                
+                // If on dashboard or specific views, trigger a silent refresh
+                if (dataChanged && window.UI && UI.currentRoute) {
+                    console.log("⚡ Background Sync: Data updated, refreshing view.");
+                    UI.renderByRoute(UI.currentRoute);
+                }
+            }
+        } catch (e) {
+            console.warn("Background sync failed:", e);
+        } finally {
+            this._isSyncing = false;
+        }
     },
 
     // ----------------------------------------
@@ -61,6 +127,7 @@ const API = {
     // ----------------------------------------
     createPatient: async function(patientData) {
         this._cache.patients.push(patientData);
+        this.persistCache();
         let res = await this._fetchGAS('CREATE_PATIENT', { data: patientData });
         this.recalculateDashboard();
         return res;
@@ -105,6 +172,7 @@ const API = {
     createPostClinicBooking: async function(data) {
         if(!this._cache.postClinicBookings) this._cache.postClinicBookings = [];
         this._cache.postClinicBookings.push(data);
+        this.persistCache();
         return await this._fetchGAS('CREATE_POSTCLINIC', { data: data });
     },
     createBatchPostClinicBookings: async function(dataArray) {
@@ -116,17 +184,61 @@ const API = {
         if(!this._cache.postClinicBookings) return;
         let index = this._cache.postClinicBookings.findIndex(t => t.id === data.id);
         if(index > -1) this._cache.postClinicBookings[index] = data;
+        
+        // --- Smart Automation: New Case Meeting Detection ---
+        const plan = (data.treatmentPlan || "").toLowerCase();
+        const keywords = ["new case", "meeting", "لجنة", "عرض", "حالات جديدة", "عرض على اللجنة"];
+        const found = keywords.some(k => plan.includes(k));
+
+        if (found) {
+            await this.initSync(); // ensure newCasesMeeting cache is ready
+            const sessionDate = data.sessionDate || new Date().toISOString().split('T')[0];
+            const alreadyExists = (this._cache.newCasesMeeting || []).some(m => 
+                (m.patientId === data.patientCode || m.patientName === data.patientName) && 
+                m.sessionDate === sessionDate
+            );
+
+            if (!alreadyExists) {
+                const meetingData = {
+                    id: 'NC_AUTO_' + new Date().getTime(),
+                    patientName: data.patientName,
+                    patientId: data.patientCode,
+                    primaryPhysician: data.providerName,
+                    sessionDate: sessionDate,
+                    treatmentPlan: data.treatmentPlan,
+                    briefHistory: 'تمت الإضافة تلقائياً بناءً على خطة العلاج.',
+                    notes: 'Auto-detected from Post-Clinic Booking',
+                    customData: ''
+                };
+                await this.createNewCaseMeeting(meetingData);
+                // We'll let the UI handle the notification if needed
+                if (window.UI && UI.showToast) {
+                    UI.showToast("⚡ ذكاء التنسيق: تم إدراج المريض تلقائياً في لجنة الحالات الجديدة", "success");
+                }
+            }
+        }
+
         return await this._fetchGAS('UPDATE_POSTCLINIC', { data: data });
     },
     deletePostClinicBooking: async function(id) {
-        if(!this._cache.postClinicBookings) return;
+        if(!this._cache || !this._cache.postClinicBookings) return;
+        // Send to server FIRST, then update cache only on success
+        let res = await this._fetchGAS('DELETE_ROW', { sheetName: 'PostClinicBookings', id: id });
+        if(res === null) throw new Error('فشل اتصال الخادم');
         this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => b.id !== id);
-        return await this._fetchGAS('DELETE_ROW', { sheetName: 'PostClinicBookings', id: id });
+        // Force full re-sync on next load to confirm server state
+        this._syncPromise = null;
+        return res;
     },
     deleteProviderBookings: async function(providerName, sessionDate) {
-        if(!this._cache.postClinicBookings) return;
+        if(!this._cache || !this._cache.postClinicBookings) return;
+        // Send to server FIRST, then update cache only on success
+        let res = await this._fetchGAS('DELETE_PROVIDER_POSTCLINIC', { providerName: providerName, sessionDate: sessionDate });
+        if(res === null) throw new Error('فشل اتصال الخادم');
         this._cache.postClinicBookings = this._cache.postClinicBookings.filter(b => !(b.providerName === providerName && b.sessionDate === sessionDate));
-        return await this._fetchGAS('DELETE_PROVIDER_POSTCLINIC', { providerName: providerName, sessionDate: sessionDate });
+        // Force full re-sync on next load to confirm server state
+        this._syncPromise = null;
+        return res;
     },
 
     getNewCasesMeeting: async function() { await this.initSync(); return this._cache.newCasesMeeting || []; },
@@ -147,14 +259,24 @@ const API = {
         return await this._fetchGAS('UPDATE_NEW_CASE', { data: data });
     },
     deleteNewCaseMeeting: async function(id) {
-        if(!this._cache.newCasesMeeting) return;
+        if(!this._cache || !this._cache.newCasesMeeting) return;
+        // Send to server FIRST, then update cache only on success
+        let res = await this._fetchGAS('DELETE_ROW', { sheetName: 'NewCasesMeeting', id: id });
+        if(res === null) throw new Error('فشل اتصال الخادم');
         this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => b.id !== id);
-        return await this._fetchGAS('DELETE_ROW', { sheetName: 'NewCasesMeeting', id: id });
+        // Force full re-sync on next load to confirm server state
+        this._syncPromise = null;
+        return res;
     },
     deleteProviderNewCases: async function(providerName, sessionDate) {
-        if(!this._cache.newCasesMeeting) return;
+        if(!this._cache || !this._cache.newCasesMeeting) return;
+        // Send to server FIRST, then update cache only on success
+        let res = await this._fetchGAS('DELETE_PROVIDER_NEW_CASES', { providerName: providerName, sessionDate: sessionDate });
+        if(res === null) throw new Error('فشل اتصال الخادم');
         this._cache.newCasesMeeting = this._cache.newCasesMeeting.filter(b => !(b.primaryPhysician === providerName && b.sessionDate === sessionDate));
-        return await this._fetchGAS('DELETE_PROVIDER_NEW_CASES', { providerName: providerName, sessionDate: sessionDate });
+        // Force full re-sync on next load to confirm server state
+        this._syncPromise = null;
+        return res;
     },
 
     // Local manual recalculate to avoid requesting the heavy dashboard array sync

@@ -25,7 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const navItems = document.querySelectorAll('.nav-links li');
     
     // Initial Load
-    navigateTo('new-cases');
+    navItems.forEach(n => n.classList.remove('active'));
+    let reportsTab = Array.from(navItems).find(n => n.getAttribute('data-route') === 'reports');
+    if (reportsTab) reportsTab.classList.add('active');
+    
+    navigateTo('reports');
     
     // Setup Routing
     navItems.forEach(item => {
@@ -49,6 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     
     function navigateTo(route) {
+        if (window.UI) UI.currentRoute = route;
         switch(route) {
             case 'dashboard':
                 UI.renderDashboard();
@@ -90,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 UI.renderDashboard();
         }
     }
+    window.navigateTo = navigateTo;
     
     // Sidebar Toggle Logic
     const menuToggleBtn = document.getElementById('menu-toggle-btn');

@@ -53,7 +53,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     
     function navigateTo(route) {
-        if (window.UI) UI.currentRoute = route;
+        if (window.UI) {
+            UI.currentRoute = route;
+            if (UI.clearFAB) UI.clearFAB();
+        }
         switch(route) {
             case 'dashboard':
                 UI.renderDashboard();

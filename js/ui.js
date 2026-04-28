@@ -11,6 +11,28 @@ const UI = {
     _masterRegistryCache: null,
     _ncCache: null, // Global cache for New Cases logic
     currentRoute: 'reports',
+    pcViewMode: 'table', // Default to table
+    ncViewMode: 'table', // Default to table
+
+    clearFAB: function() {
+        const fabContainer = document.getElementById('global-fab-container');
+        if(fabContainer) fabContainer.innerHTML = '';
+    },
+
+    setFAB: function(html) {
+        const fabContainer = document.getElementById('global-fab-container');
+        if(fabContainer) fabContainer.innerHTML = html;
+    },
+
+    togglePCViewMode: function() {
+        this.pcViewMode = this.pcViewMode === 'cards' ? 'table' : 'cards';
+        this.renderPostClinicBookings();
+    },
+
+    toggleNCViewMode: function() {
+        this.ncViewMode = this.ncViewMode === 'cards' ? 'table' : 'cards';
+        this.renderNewCasesMeeting();
+    },
 
     renderByRoute: function(route) {
         // When background sync triggers a refresh, we want fresh data
@@ -1191,7 +1213,7 @@ Oncology Coordinator System`;
                  
                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; border-top:1px solid #f1f5f9; padding-top:12px;">
                      ${!inFollowUp ? `
-                         <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.startFollowUp('${b.id}')">🚶 متابعة</button>
+                         <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
                      ` : `
                          <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.finishFollowUp('${b.id}')">✅ انتهاء المهمة</button>
                      `}
@@ -1199,6 +1221,86 @@ Oncology Coordinator System`;
                  </div>
              </div>
          </div>
+        `;
+    },
+
+    getPCBookingTableRowHTML: function(b, isRegisteredInMeeting) {
+        const inFollowUp = b.followUpStatus === 'ACTIVE';
+        
+        // Handle custom columns
+        let dynamicFields = '';
+        if(this.pcCustomColumns && this.pcCustomColumns.length > 0) {
+            let customData = {};
+            if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
+            dynamicFields = this.pcCustomColumns.map(col => `
+                <td style="padding:12px 15px;">
+                    <input type="text" class="pc-input" value="${customData[col] || ''}" 
+                           onchange="UI.updatePCRow('${b.id}', 'custom_${col}', this.value)"
+                           style="width:100%; border:none; background:transparent; font-size:0.85rem;">
+                </td>
+            `).join('');
+        }
+
+        return `
+        <tr id="tr-${b.id}" style="border-bottom:1px solid #f1f5f9; transition:background 0.2s; vertical-align:top;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+            <td style="padding:12px 15px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" class="pc-selection-checkbox" data-id="${b.id}" ${(UI.selectedPostClinicIds || []).includes(b.id) ? 'checked' : ''} onchange="UI.handlePCSelection('${b.id}', this.checked)" style="width:18px; height:18px; accent-color:#0d9488;">
+                    <div>
+                        <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'patientName', this.value)" style="font-weight:900; color:#0f766e; background:transparent; border:none; width:180px; resize:none; font-size:0.95rem;">${b.patientName || ''}</textarea>
+                        ${isRegisteredInMeeting ? '<div style="font-size:0.65rem; color:#0d9488; font-weight:bold; margin-top:2px;">✅ مسجل باللجنة</div>' : ''}
+                        ${inFollowUp ? '<div style="font-size:0.65rem; color:#b45309; font-weight:bold; margin-top:2px;">⏳ قيد المتابعة</div>' : ''}
+                    </div>
+                </div>
+            </td>
+            <td style="padding:12px 15px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <input type="text" class="pc-input" value="${b.patientCode || ''}" onchange="UI.updatePCRow('${b.id}', 'patientCode', this.value)" placeholder="MRN" style="font-family:monospace; font-size:0.8rem; width:90px; border:none; background:transparent; font-weight:700;">
+                    <input type="text" class="pc-input" value="${b.patientAge || ''}" onchange="UI.updatePCRow('${b.id}', 'patientAge', this.value)" placeholder="العمر" style="font-size:0.8rem; width:90px; border:none; background:transparent;">
+                </div>
+            </td>
+            <td style="padding:12px 15px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <input type="text" class="pc-input" value="${b.providerName || ''}" onchange="UI.updatePCRow('${b.id}', 'providerName', this.value)" style="font-weight:700; border:none; background:transparent; width:130px; font-size:0.9rem;">
+                    <input type="text" class="pc-input" value="${b.phoneNumber || ''}" onchange="UI.updatePCRow('${b.id}', 'phoneNumber', this.value)" placeholder="الهاتف" style="font-size:0.8rem; border:none; background:transparent; direction:ltr;">
+                </div>
+            </td>
+            <td style="padding:12px 15px;">
+                <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'treatmentPlan', this.value)" style="width:100%; min-height:70px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:0.95rem; padding:8px; line-height:1.4; color:#92400e; font-weight:600;">${b.treatmentPlan || ''}</textarea>
+            </td>
+            <td style="padding:12px 15px;">
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="checkbox" ${b.notifiedPatient === 'Y' ? 'checked' : ''} onchange="UI.updatePCRow('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')">
+                        <span style="font-size:0.8rem; font-weight:900; color:var(--primary);">تم التبليغ</span>
+                    </div>
+                    <input type="date" class="pc-input" value="${b.opcDate || ''}" onchange="UI.updatePCRow('${b.id}', 'opcDate', this.value)" style="font-size:0.85rem; padding:4px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:4px; width:140px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+                         <select class="pc-select ${b.permit === 'Y' ? 'yes' : b.permit === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'permit', this.value)" style="padding:2px; font-size:0.75rem;">
+                              <option value="">Permit</option>
+                              <option value="Y" ${b.permit === 'Y' ? 'selected' : ''}>Y</option>
+                              <option value="N" ${b.permit === 'N' ? 'selected' : ''}>N</option>
+                         </select>
+                         <select class="pc-select ${b.referral === 'Y' ? 'yes' : b.referral === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'referral', this.value)" style="padding:2px; font-size:0.75rem;">
+                              <option value="">Ref</option>
+                              <option value="Y" ${b.referral === 'Y' ? 'selected' : ''}>Y</option>
+                              <option value="N" ${b.referral === 'N' ? 'selected' : ''}>N</option>
+                         </select>
+                    </div>
+                </div>
+            </td>
+            ${dynamicFields}
+            <td style="padding:12px 15px;">
+                <div style="display:flex; flex-direction:column; gap:6px; justify-content:center;">
+                     ${!inFollowUp ? `
+                        <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
+                    ` : `
+                        <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="UI.finishFollowUp('${b.id}')">✅ انتهاء</button>
+                    `}
+                    <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="UI.deletePCRow('${b.id}')">🗑️ حذف</button>
+                </div>
+            </td>
+        </tr>
         `;
     },
 
@@ -1267,24 +1369,67 @@ Oncology Coordinator System`;
             this._ncCache = newCasesList;
         }
 
-        let rows = filteredActiveData.map(b => {
-             let isRegisteredInMeeting = newCasesList.some(m => 
-                (m.patientId === b.patientCode || m.patientName === b.patientName) && 
-                (m.sessionDate === b.sessionDate || m.sessionDate === window.globalArchiveDate)
-             );
+        let contentHTML = '';
+        if (this.pcViewMode === 'table') {
+             let tableRows = filteredActiveData.map(b => {
+                 let isRegisteredInMeeting = newCasesList.some(m => 
+                    (m.patientId === b.patientCode || m.patientName === b.patientName) && 
+                    (m.sessionDate === b.sessionDate || m.sessionDate === window.globalArchiveDate)
+                 );
+                 return this.getPCBookingTableRowHTML(b, isRegisteredInMeeting);
+             }).join('');
 
-             return this.getPCBookingCardHTML(b, isRegisteredInMeeting);
-        }).join('');
+             contentHTML = `
+                <div style="background:#fff; border-radius:12px; border:1px solid #e2e8f0; overflow:hidden; box-shadow:var(--shadow-sm); margin-bottom:20px;">
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; min-width:1200px;">
+                            <thead style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                <tr style="color:#64748b; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">
+                                    <th style="padding:15px; text-align:right;">👤 المريض / الحالة</th>
+                                    <th style="padding:15px; text-align:right;">🔢 الكود والعمر</th>
+                                    <th style="padding:15px; text-align:right;">👨‍⚕️ الطبيب والهاتف</th>
+                                    <th style="padding:15px; text-align:right; width:30%;">📋 خطة العلاج</th>
+                                    <th style="padding:15px; text-align:right;">📅 الموعد والحالة</th>
+                                    ${this.pcCustomColumns.map(col => `<th style="padding:15px; text-align:right;">${col}</th>`).join('')}
+                                    <th style="padding:15px; text-align:center;">⚙️ إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows || '<tr><td colspan="20" style="padding:60px; text-align:center; color:var(--text-muted); font-weight:bold;">لا يوجد مرضى حالياً في هذا التبويب.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+             `;
+        } else {
+             let cardsHTML = filteredActiveData.map(b => {
+                 let isRegisteredInMeeting = newCasesList.some(m => 
+                    (m.patientId === b.patientCode || m.patientName === b.patientName) && 
+                    (m.sessionDate === b.sessionDate || m.sessionDate === window.globalArchiveDate)
+                 );
+                 return this.getPCBookingCardHTML(b, isRegisteredInMeeting);
+             }).join('');
+
+             contentHTML = `
+                <div id="pc-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; align-items: stretch; justify-content: center;">
+                    ${cardsHTML || '<div style="grid-column: 1 / -1; text-align:center; padding: 40px; color:var(--text-muted); font-size:1.1rem; background:#fff; border-radius:12px; border:1px dashed #cbd5e1;">لا يوجد مرضى لهذا الطبيب. قم باستيراد ملف.</div>'}
+                </div>
+             `;
+        }
 
         this.container.innerHTML = `
-            <div class="card" style="background:transparent; box-shadow:none; padding:0;">
+            <div style="position:relative;">
                 <div class="no-print" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap:wrap; gap:16px; background:#fff; padding:20px; border-radius:12px; box-shadow:var(--shadow-sm);">
                     <div>
                         <h3 style="margin-bottom:8px;">عقود ما بعد العيادة (لجان الأطباء)</h3>
                         <p style="color:var(--text-muted); font-size:0.95rem; margin:0;">اختر التبويب الخاص بالطبيب لمعاينة وطباعة مرضاه المخصصين.</p>
                     </div>
                     <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-                        <div style="position:relative; width:300px; margin-left:10px;">
+                        <button class="btn btn-primary" onclick="UI.togglePCViewMode()" style="background:#6366f1; color:white; border:none; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:8px;" title="تبديل طريقة العرض">
+                            <span>${this.pcViewMode === 'cards' ? '📊 عرض كجدول' : '🗂️ عرض كبطاقات'}</span>
+                        </button>
+                        
+                        <div style="position:relative; width:280px;">
                             <input type="text" id="pc-search" value="${this.postClinicSearchQuery || ''}" 
                                    placeholder="بحث بالاسم أو الكود..." 
                                    oninput="UI.postClinicSearchQuery=this.value; UI.renderPostClinicBookings()"
@@ -1319,14 +1464,16 @@ Oncology Coordinator System`;
                 ${tabsHTML}
                 ${UI.buildStatsBar(filteredActiveData)}
                 
-                <div id="pc-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; align-items: stretch; justify-content: center;">
-                    ${filteredActiveData.length > 0 ? rows : '<div style="grid-column: 1 / -1; text-align:center; padding: 40px; color:var(--text-muted); font-size:1.1rem; background:#fff; border-radius:12px; border:1px dashed #cbd5e1;">لا يوجد مرضى لهذا الطبيب. قم باستيراد ملف.</div>'}
-                </div>
-                <div class="no-print" style="margin-top:16px;">
-                    <button class="btn btn-primary" style="padding:8px 24px;" onclick="UI.addPostClinicRow()">+ إضافة صف يدوياً</button>
-                </div>
+                ${contentHTML}
             </div>
         `;
+
+        this.setFAB(`
+            <!-- Global FAB (Forced Top Level) -->
+            <button class="no-print" onclick="UI.addPostClinicRow()" style="position:fixed; bottom:84px; right:24px; width:48px; height:48px; border-radius:50%; background:#f59e0b; color:white; border:2px solid white; box-shadow:0 8px 32px rgba(0,0,0,0.5); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.8rem; z-index:99999; transition:all 0.2s ease;" onmouseover="this.style.transform='scale(1.1)';" onmouseout="this.style.transform='scale(1)';" title="إضافة مريض جديد">
+                +
+            </button>
+        `);
 
         if (isFocused) {
             requestAnimationFrame(() => {
@@ -1344,6 +1491,7 @@ Oncology Coordinator System`;
         
         this._masterRegistryCache = null;
         this._pcCache = null;
+        this._followUpCache = null;
 
         let allData = await API.getPostClinicBookings();
         let row = allData.find(r => r.id === id);
@@ -1365,26 +1513,32 @@ Oncology Coordinator System`;
         await API.updatePostClinicBooking(row);
         
         if(tr) tr.style.opacity = '1';
+        UI.showSaved();
     },
 
-    deletePCRow: async function(id) {
+    deletePCRow: function(id) {
         if(!confirm("هل أنت متأكد من حذف هذا الصف نهائياً؟")) return;
+        
+        let tr = document.getElementById('tr-' + id);
+        if(tr) tr.remove();
         
         this._masterRegistryCache = null;
         this._pcCache = null;
+        this._followUpCache = null;
 
-        let tr = document.getElementById('tr-' + id);
-        if(tr) tr.style.opacity = '0.3';
+        UI.showSaving();
         
-        try {
-            await API.deletePostClinicBooking(id);
+        API.deletePostClinicBooking(id).then(() => {
+            UI.showSaved();
             UI.showToast("تم حذف الملف بنجاح ✅");
-            UI.renderPostClinicBookings();
-        } catch(err) {
+            if (this.currentRoute === 'post-clinic') {
+                UI.renderPostClinicBookings();
+            }
+        }).catch(err => {
             console.error(err);
-            if(tr) tr.style.opacity = '1';
-            UI.showToast("فشل الحذف — تحقق من اتصال قاعدة البيانات", "error");
-        }
+            UI.showToast("فشل الحذف — سيتم إعادة تحميل الصفحة", "error");
+            setTimeout(() => location.reload(), 1500);
+        });
     },
 
     deleteProviderBookings: async function(providerName) {
@@ -1746,10 +1900,10 @@ Oncology Coordinator System`;
 
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:12px; margin-top:4px;">
                 <div style="display:flex; gap:16px; align-items:center;">
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; background:#fef3c7; padding:6px 12px; border-radius:20px; border:1px solid #fde68a;">
-                        <input type="checkbox" ${isFollowUpActive ? 'checked' : ''} onchange="UI.updateNCCustomData('${b.id}', 'followUpStatus', this.checked ? 'ACTIVE' : '')" style="transform:scale(1.2);">
-                        <strong style="color:#92400e; font-size:0.9rem;">⏳ يحتاج متابعة</strong>
-                    </label>
+                    ${isFollowUpActive ? 
+                        `<button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 12px; border-radius:20px; font-weight:bold;" onclick="UI.finishFollowUp('${b.id}', 'NC')">✅ إنهاء المتابعة</button>` :
+                        `<button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 12px; border-radius:20px; font-weight:bold;" onclick="UI.startFollowUp('${b.id}', 'NC')">🚶 طلب متابعة</button>`
+                    }
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                         <input type="checkbox" ${b.customData && b.customData.includes('"notifiedPatient":"Y"') ? 'checked' : ''} onchange="UI.updateNCCustomData('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')" style="transform:scale(1.2);">
                         <strong style="color:var(--primary); font-size:0.9rem;">تم التبليغ ✅</strong>
@@ -1777,6 +1931,77 @@ Oncology Coordinator System`;
             </div>
         </div>
         `;
+    },
+
+    getNCBookingTableRowHTML: function(b) {
+        let isFollowUpActive = b.customData && b.customData.includes('"followUpStatus":"ACTIVE"');
+        let isAutoTransferred = String(b.id).startsWith('NC_AUTO_');
+        
+        return `
+        <tr id="tr-nc-${b.id}" style="border-bottom:1px solid #f1f5f9; vertical-align:top; transition:background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+            <td style="padding:12px 15px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" class="nc-checkbox" data-id="${b.id}" ${(UI.selectedNewCaseIds || []).includes(b.id) ? 'checked' : ''} onchange="UI.handleNCSelection('${b.id}', this.checked)" style="width:18px; height:18px; accent-color:var(--primary); cursor:pointer;">
+                    <div>
+                        <input type="text" class="nc-input-bold" value="${b.patientName || ''}" onchange="UI.updateNewCaseRow('${b.id}', 'patientName', this.value)" style="font-weight:900; color:var(--primary); border:none; background:transparent; font-size:1rem; width:180px; outline:none;">
+                        ${isAutoTransferred ? '<div style="font-size:0.65rem; color:var(--primary); font-weight:bold; margin-top:2px;">⚡ تم التحويل تلقائياً</div>' : ''}
+                    </div>
+                </div>
+            </td>
+            <td style="padding:12px 15px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <input type="text" class="pc-input" value="${b.patientId || ''}" onchange="UI.updateNewCaseRow('${b.id}', 'patientId', this.value)" placeholder="MRN" style="font-family:monospace; font-size:0.8rem; width:90px; border:none; background:transparent; font-weight:700;">
+                    <input type="text" class="pc-input" value="${b.primaryPhysician || ''}" onchange="UI.updateNewCaseRow('${b.id}', 'primaryPhysician', this.value)" placeholder="الطبيب" style="font-size:0.8rem; width:120px; border:none; background:transparent;">
+                </div>
+            </td>
+            <td style="padding:12px 15px;">
+                <textarea class="pc-input" onchange="UI.updateNewCaseRow('${b.id}', 'treatmentPlan', this.value)" style="width:100%; min-height:70px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:0.95rem; padding:8px; line-height:1.4; color:#92400e; font-weight:600;">${b.treatmentPlan || ''}</textarea>
+            </td>
+            <td style="padding:12px 15px;">
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${isFollowUpActive ? 
+                        `<button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 10px; font-size:0.8rem; border-radius:6px; font-weight:bold; width:fit-content;" onclick="UI.finishFollowUp('${b.id}', 'NC')">✅ إنهاء المتابعة</button>` :
+                        `<button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 10px; font-size:0.8rem; border-radius:6px; font-weight:bold; width:fit-content;" onclick="UI.startFollowUp('${b.id}', 'NC')">🚶 طلب متابعة</button>`
+                    }
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="checkbox" ${b.customData && b.customData.includes('"notifiedPatient":"Y"') ? 'checked' : ''} onchange="UI.updateNCCustomData('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')">
+                        <span style="font-size:0.8rem; font-weight:bold; color:var(--primary);">تبليغ ✅</span>
+                    </label>
+                </div>
+            </td>
+            <td style="padding:12px 15px; position:relative;">
+                <div style="display:flex; gap:6px; justify-content:center;">
+                    <button class="btn" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:6px 10px; font-size:0.8rem; border-radius:6px; font-weight:bold;" onclick="UI.toggleNCExtraDetails('${b.id}')">📝 تفاصيل</button>
+                    <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; padding:6px 10px; font-size:0.8rem; border-radius:6px; font-weight:bold;" onclick="UI.deleteNewCaseRow('${b.id}')">🗑️ حذف</button>
+                </div>
+                <div id="nc-extra-${b.id}" style="display:none; position:absolute; left:0; top:100%; background:white; box-shadow:var(--shadow-xl); border-radius:12px; padding:20px; z-index:1000; border:1px solid #e2e8f0; min-width:450px; margin-top:8px;">
+                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <div>
+                            <label style="font-size:0.8rem; font-weight:900; color:var(--text-muted); display:block; margin-bottom:6px;">📖 Brief History</label>
+                            <textarea class="pc-input" onchange="UI.updateNewCaseRow('${b.id}', 'briefHistory', this.value)" style="width:100%; min-height:120px; font-size:0.9rem;">${b.briefHistory || ''}</textarea>
+                        </div>
+                        <div>
+                            <label style="font-size:0.8rem; font-weight:900; color:var(--text-muted); display:block; margin-bottom:6px;">📝 Notes</label>
+                            <textarea class="pc-input" onchange="UI.updateNewCaseRow('${b.id}', 'notes', this.value)" style="width:100%; min-height:120px; font-size:0.9rem;">${b.notes || ''}</textarea>
+                        </div>
+                     </div>
+                     <div style="margin-top:12px; text-align:left;">
+                        <button class="btn" style="background:var(--primary); color:white; border:none; padding:4px 12px; border-radius:6px; font-size:0.8rem;" onclick="this.parentElement.parentElement.style.display='none'">إغلاق</button>
+                     </div>
+                </div>
+            </td>
+        </tr>
+        `;
+    },
+
+    toggleNCExtraDetails: function(id) {
+        const el = document.getElementById('nc-extra-' + id);
+        if(el) {
+            const isHidden = el.style.display === 'none';
+            // Close other extras
+            document.querySelectorAll('[id^="nc-extra-"]').forEach(d => d.style.display = 'none');
+            el.style.display = isHidden ? 'block' : 'none';
+        }
     },
 
     parseNCCustomData: function(dataStr) {
@@ -1829,32 +2054,65 @@ Oncology Coordinator System`;
             html = '<div style="text-align:center; padding: 40px; color:var(--text-muted); font-size:1.1rem; background:#fff; border-radius:12px; border:1px dashed #cbd5e1;">لا توجد حالات جديدة (أو جميعها مؤرشفة).</div>';
         } else {
             for(let date of sortedDates) {
-                let cardsHtml = groups[date].map(b => this.getNCBookingCardHTML(b)).join('');
-                html += `
-                    <div style="margin-bottom:30px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px 20px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:16px;">
-                            <h4 style="margin:0; font-size:1.1rem; color:#1e293b;">📅 قائمة يوم: ${date}</h4>
-                            <div style="display:flex; gap:10px;">
-                                <button class="btn" style="background:#e0f2fe; color:#0369a1; border:none; padding:6px 12px; border-radius:6px; font-weight:bold;" onclick="UI.printNewCasesTable('${date}')">🖨️ طباعة</button>
-                                <button class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:6px 12px; border-radius:6px; font-weight:bold;" onclick="UI.archiveNCDate('${date}')">📦 أرشفة وإخفاء</button>
+                let itemsHtml = '';
+                if (this.ncViewMode === 'table') {
+                    let tableRows = groups[date].map(b => this.getNCBookingTableRowHTML(b)).join('');
+                    itemsHtml = `
+                        <div style="background:#fff; border-radius:12px; border:1px solid #e2e8f0; overflow:visible; box-shadow:var(--shadow-sm); margin-bottom:20px;">
+                            <div style="overflow-x:auto; overflow-y:visible;">
+                                <table style="width:100%; border-collapse:collapse; min-width:1000px;">
+                                    <thead style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                        <tr style="color:#64748b; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">
+                                            <th style="padding:15px; text-align:right;">👤 المريض / الحالة</th>
+                                            <th style="padding:15px; text-align:right;">🔢 الكود والطبيب</th>
+                                            <th style="padding:15px; text-align:right; width:40%;">📋 خطة العلاج</th>
+                                            <th style="padding:15px; text-align:right;">⚙️ متابعة وتبليغ</th>
+                                            <th style="padding:15px; text-align:center;">🛠️ إجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${tableRows}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
+                    `;
+                } else {
+                    let cardsHtml = groups[date].map(b => this.getNCBookingCardHTML(b)).join('');
+                    itemsHtml = `
                         <div style="display:flex; flex-direction:column; gap:8px;">
                             ${cardsHtml}
                         </div>
+                    `;
+                }
+
+                html += `
+                    <div style="margin-bottom:40px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px 20px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:16px;">
+                            <h4 style="margin:0; font-size:1.1rem; color:#1e293b;">📅 قائمة يوم: ${date}</h4>
+                            <div style="display:flex; gap:10px;">
+                                <button class="btn" style="background:#e0f2fe; color:#0369a1; border:none; padding:6px 12px; border-radius:6px; font-weight:bold;" onclick="UI.printNewCasesTable('${date}')">🖨️ طباعة القائمة</button>
+                                <button class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:6px 12px; border-radius:6px; font-weight:bold;" onclick="UI.archiveNCDate('${date}')">📦 أرشفة وإخفاء</button>
+                            </div>
+                        </div>
+                        ${itemsHtml}
                     </div>
                 `;
             }
         }
 
         this.container.innerHTML = `
-            <div class="card" style="background:transparent; box-shadow:none; padding:0;">
+            <div style="position:relative;">
                 <div class="no-print" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap:wrap; gap:16px; background:#fff; padding:20px; border-radius:12px; box-shadow:var(--shadow-sm);">
                     <div>
                         <h3 style="margin-bottom:8px;">لجنة الحالات الجديدة (New Cases Meeting)</h3>
                         <p style="color:var(--text-muted); font-size:0.95rem; margin:0;">استعراض مجمع للحالات الجديدة مع إمكانية أرشفة القوائم السابقة وإضافة المتابعة.</p>
                     </div>
                     <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+                        <button class="btn btn-primary" onclick="UI.toggleNCViewMode()" style="background:#6366f1; color:white; border:none; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:8px;" title="تبديل طريقة العرض">
+                            <span>${this.ncViewMode === 'cards' ? '📊 عرض كجدول' : '🗂️ عرض كبطاقات'}</span>
+                        </button>
+
                         <input type="file" id="nc-excel-import" accept=".xlsx, .xls, .csv" style="display:none;" onchange="UI.handleNewCasesExcelImport(event)">
                         
                         <div class="dropdown" style="position:relative;">
@@ -1870,7 +2128,6 @@ Oncology Coordinator System`;
                         </div>
 
                         <button class="btn btn-primary" style="background:#10b981; color:white; border:none; border-radius:8px; padding:10px 16px;" onclick="document.getElementById('nc-excel-import').click()">📥 استيراد Excel</button>
-                        <button class="btn btn-primary" style="border:1px solid var(--border); border-radius:8px; padding:10px 16px; background:#fff; color:var(--text);" onclick="UI.showAddNCModal()">+ إضافة حالة يدوياً</button>
                         <button class="btn btn-primary" onclick="UI.printNewCasesTable()" style="background:#334155; border:none; border-radius:8px; padding:10px 16px; color:#fff;">🖨️ طباعة عامة للجنة</button>
                     </div>
                 </div>
@@ -1880,10 +2137,22 @@ Oncology Coordinator System`;
                 </div>
             </div>
         `;
+
+        this.setFAB(`
+            <!-- Global FAB (Forced Top Level) -->
+            <button class="no-print" onclick="UI.showAddNCModal()" style="position:fixed; bottom:84px; right:24px; width:48px; height:48px; border-radius:50%; background:#f59e0b; color:white; border:2px solid white; box-shadow:0 8px 32px rgba(0,0,0,0.5); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.8rem; z-index:99999; transition:all 0.2s ease;" onmouseover="this.style.transform='scale(1.1)';" onmouseout="this.style.transform='scale(1)';" title="إضافة حالة جديدة للجنة">
+                +
+            </button>
+        `);
     },
 
     updateNewCaseRow: async function(id, field, value) {
         UI.showSaving();
+        
+        this._ncCache = null;
+        this._followUpCache = null;
+        this._masterRegistryCache = null;
+
         let allData = await API.getNewCasesMeeting();
         let row = allData.find(r => r.id === id);
         if(!row) return;
@@ -1897,20 +2166,29 @@ Oncology Coordinator System`;
         }
     },
 
-    deleteNewCaseRow: async function(id) {
+    deleteNewCaseRow: function(id) {
         if(!confirm("هل أنت متأكد من حذف هذه الحالة نهائياً؟")) return;
-        let tr = document.getElementById('tr-nc-' + id);
-        if(tr) tr.style.opacity = '0.3';
         
-        try {
-            await API.deleteNewCaseMeeting(id);
+        let tr = document.getElementById('tr-nc-' + id);
+        if(tr) tr.remove();
+        
+        this._ncCache = null;
+        this._followUpCache = null;
+        this._masterRegistryCache = null;
+
+        UI.showSaving();
+        
+        API.deleteNewCaseMeeting(id).then(() => {
+            UI.showSaved();
             UI.showToast("تم حذف الحالة بنجاح ✅");
-            UI.renderNewCasesMeeting();
-        } catch(err) {
+            if (this.currentRoute === 'new-cases') {
+                UI.renderNewCasesMeeting();
+            }
+        }).catch(err => {
             console.error(err);
-            if(tr) tr.style.opacity = '1';
-            UI.showToast("فشل الحذف — تحقق من اتصال قاعدة البيانات", "error");
-        }
+            UI.showToast("فشل الحذف — سيتم إعادة تحميل الصفحة", "error");
+            setTimeout(() => location.reload(), 1500);
+        });
     },
 
     showAddNCModal: function() {
@@ -2818,20 +3096,24 @@ Oncology Coordinator System`;
                 followUps.push({
                     id: b.id, source: 'PC', patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientCode || '---', providerName: b.providerName || 'غير محدد',
-                    sessionDate: b.sessionDate || '---', followUpNotes: b.followUpNotes || 'لا توجد ملاحظات'
+                    sessionDate: b.sessionDate || '---', 
+                    followUpNotes: b.followUpNotes || '',
+                    treatmentPlan: b.treatmentPlan || ''
                 });
             } else if (b.notifiedPatient !== 'Y') {
                 if (b.opcDate && b.opcDate.trim() !== '') {
                     unnotified.push({
                         id: b.id, source: 'PC', patientName: b.patientName || 'بدون اسم',
                         patientCode: b.patientCode || '---', providerName: b.providerName || 'غير محدد',
-                        sessionDate: b.sessionDate || '---', followUpNotes: 'بانتظار تبليغ المريض'
+                        sessionDate: b.sessionDate || '---', followUpNotes: 'بانتظار تبليغ المريض',
+                        treatmentPlan: b.treatmentPlan || ''
                     });
                 } else {
                     awaitingAppt.push({
                         id: b.id, source: 'PC', patientName: b.patientName || 'بدون اسم',
                         patientCode: b.patientCode || '---', providerName: b.providerName || 'غير محدد',
-                        sessionDate: b.sessionDate || '---', followUpNotes: 'بانتظار تحديد موعد'
+                        sessionDate: b.sessionDate || '---', followUpNotes: 'بانتظار تحديد موعد',
+                        treatmentPlan: b.treatmentPlan || ''
                     });
                 }
             }
@@ -2843,7 +3125,9 @@ Oncology Coordinator System`;
                 followUps.push({
                     id: b.id, source: 'NC', patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientId || '---', providerName: b.primaryPhysician || 'غير محدد',
-                    sessionDate: b.sessionDate || '---', followUpNotes: cData.followUpNotes || 'لا توجد ملاحظات'
+                    sessionDate: b.sessionDate || '---', 
+                    followUpNotes: cData.followUpNotes || '',
+                    treatmentPlan: b.treatmentPlan || ''
                 });
             }
         });
@@ -2857,12 +3141,18 @@ Oncology Coordinator System`;
         const expandDisplay = isSearching ? 'block' : 'none';
         const expandArrow = isSearching ? 'rotate(180deg)' : 'rotate(0deg)';
         
-        let notified = followUps.filter(b => 
+        let pcNotified = followUps.filter(b => b.source === 'PC' && (
             String(b.patientName || '').toLowerCase().includes(query) || 
             String(b.patientCode || '').includes(query) || 
             String(b.followUpNotes || '').toLowerCase().includes(query) || 
             String(b.providerName || '').toLowerCase().includes(query)
-        );
+        ));
+        let ncNotified = followUps.filter(b => b.source === 'NC' && (
+            String(b.patientName || '').toLowerCase().includes(query) || 
+            String(b.patientCode || '').includes(query) || 
+            String(b.followUpNotes || '').toLowerCase().includes(query) || 
+            String(b.providerName || '').toLowerCase().includes(query)
+        ));
         unnotified = unnotified.filter(b => 
             String(b.patientName || '').toLowerCase().includes(query) || 
             String(b.patientCode || '').includes(query) || 
@@ -2876,7 +3166,26 @@ Oncology Coordinator System`;
             String(b.providerName || '').toLowerCase().includes(query)
         );
 
-        const generateRows = (arr) => arr.map(b => `
+        const generateRows = (arr) => arr.map(b => {
+            let noteContent = '';
+            let hasFollowUpNotes = b.followUpNotes && b.followUpNotes.trim() !== '' && b.followUpNotes !== 'بانتظار تبليغ المريض' && b.followUpNotes !== 'بانتظار تحديد موعد';
+            let isSystemNote = b.followUpNotes === 'بانتظار تبليغ المريض' || b.followUpNotes === 'بانتظار تحديد موعد';
+
+            let showPlanBtn = '';
+            if (b.treatmentPlan && b.treatmentPlan.trim() !== '') {
+                showPlanBtn = `<div style="margin-top:8px;">
+                    <button onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'" style="background:none; border:none; color:#b45309; text-decoration:underline; cursor:pointer; font-size:0.8rem; padding:0; font-weight:bold;">عرض خطة العلاج 📜</button>
+                    <div style="display:none; margin-top:8px; padding-top:8px; border-top:1px dashed #fcd34d; font-size:0.85rem; color:#78350f;">${b.treatmentPlan}</div>
+                </div>`;
+            }
+
+            if (hasFollowUpNotes || isSystemNote) {
+                noteContent = `<div style="font-weight:bold;">${b.followUpNotes}</div>` + showPlanBtn;
+            } else {
+                noteContent = b.treatmentPlan ? b.treatmentPlan : '';
+            }
+
+            return `
             <tr style="transition:background 0.2s;" onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='white'">
                 <td style="padding:15px; border-bottom:1px solid #f1f5f9;">
                     <div style="font-weight:900; color:var(--primary);">${b.patientName}</div>
@@ -2885,7 +3194,7 @@ Oncology Coordinator System`;
                 <td style="padding:15px; border-bottom:1px solid #f1f5f9; font-weight:700; color:#334155;">د. ${b.providerName}</td>
                 <td style="padding:15px; border-bottom:1px solid #f1f5f9;">
                     <div style="background:#fffbeb; color:#92400e; padding:8px 12px; border-radius:8px; border-right:4px solid #f59e0b; font-size:0.9rem; max-width:400px;">
-                        ${b.followUpNotes}
+                        ${noteContent}
                     </div>
                 </td>
                 <td style="padding:15px; border-bottom:1px solid #f1f5f9; font-size:0.85rem; color:#64748b;">${b.sessionDate}</td>
@@ -2896,7 +3205,8 @@ Oncology Coordinator System`;
                     </div>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
         this.container.innerHTML = `
             <div class="card animate-fade" style="padding:0; overflow:hidden; border-radius:15px; box-shadow:var(--shadow-lg);">
@@ -2928,7 +3238,10 @@ Oncology Coordinator System`;
                         <div style="display:flex; align-items:center; gap:8px;">
                             🚨 مرضى بانتظار التبليغ العاجل (${unnotified.length})
                         </div>
-                        <span id="urgent-unnotified-arrow" style="transition: transform 0.3s; transform: ${expandArrow}; font-size: 1.2rem;">▼</span>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn no-print" onclick="event.stopPropagation(); UI.printSpecificFollowUpList('unnotified')" style="padding:4px 10px; font-size:0.8rem; background:white; color:#b91c1c; border:1px solid #fca5a5; border-radius:6px;">🖨️ طباعة</button>
+                            <span id="urgent-unnotified-arrow" style="transition: transform 0.3s; transform: ${expandArrow}; font-size: 1.2rem;">▼</span>
+                        </div>
                     </div>
                     <div id="urgent-unnotified-content" style="display:${expandDisplay}; overflow-x:auto;">
                         <table style="width:100%; border-collapse:collapse; min-width:800px;">
@@ -2944,7 +3257,10 @@ Oncology Coordinator System`;
                         <div style="display:flex; align-items:center; gap:8px;">
                             ⏳ مرضى بانتظار تحديد موعد (${awaitingAppt.length})
                         </div>
-                        <span id="awaiting-appt-arrow" style="transition: transform 0.3s; transform: ${expandArrow}; font-size: 1.2rem;">▼</span>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn no-print" onclick="event.stopPropagation(); UI.printSpecificFollowUpList('awaitingAppt')" style="padding:4px 10px; font-size:0.8rem; background:white; color:#b45309; border:1px solid #fde68a; border-radius:6px;">🖨️ طباعة</button>
+                            <span id="awaiting-appt-arrow" style="transition: transform 0.3s; transform: ${expandArrow}; font-size: 1.2rem;">▼</span>
+                        </div>
                     </div>
                     <div id="awaiting-appt-content" style="display:${expandDisplay}; overflow-x:auto;">
                         <table style="width:100%; border-collapse:collapse; min-width:800px;">
@@ -2956,27 +3272,71 @@ Oncology Coordinator System`;
 
                 <div class="session-stats-bar" style="border-radius:0; margin:0; padding:15px 25px; background:#f8fafc; border-bottom:1px solid #f1f5f9;">
                     <div class="stat-chip">
-                        <span>📋 إجمالي الحالات قيد المتابعة الروتينية</span>
-                        <span class="stat-value" data-target="${notified.length}">${notified.length}</span>
+                        <span>📋 متابعات حجوزات العيادة</span>
+                        <span class="stat-value">${pcNotified.length}</span>
+                    </div>
+                    <div class="stat-chip">
+                        <span>📋 متابعات لجنة الحالات الجديدة</span>
+                        <span class="stat-value">${ncNotified.length}</span>
                     </div>
                 </div>
 
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; min-width:800px;">
-                        <thead>
-                            <tr style="background:#f8fafc; color:var(--text-muted); text-align:right; font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">
-                                <th style="padding:15px; font-weight:900;">المريض / الكود</th>
-                                <th style="padding:15px; font-weight:900;">الجهة (الطبيب)</th>
-                                <th style="padding:15px; font-weight:900;">مهمة المتابعة المطلوبة</th>
-                                <th style="padding:15px; font-weight:900;">تاريخ الجلسة الأصلية</th>
-                                <th style="padding:15px; font-weight:900; text-align:left;">إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${notified.length > 0 ? generateRows(notified) : '<tr><td colspan="5" style="text-align:center; padding:40px; color:#94a3b8; font-size:1.1rem;">لا توجد مهام متابعة روتينية معلقة حالياً. أحسنت! 🎉</td></tr>'}
-                        </tbody>
-                    </table>
+                <div style="background:#f0f9ff; border-bottom:2px solid #bae6fd;">
+                    <div onclick="const content = document.getElementById('pc-followup-content'); const arrow = document.getElementById('pc-followup-arrow'); if(content.style.display==='none'){content.style.display='block'; arrow.style.transform='rotate(180deg)';}else{content.style.display='none'; arrow.style.transform='rotate(0deg)';}" style="padding:15px 25px; color:#0369a1; font-weight:900; font-size:1.1rem; border-bottom:1px solid #e0f2fe; display:flex; align-items:center; justify-content:space-between; cursor:pointer; transition: background 0.2s;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            🚶 قائمة المتابعة - من حجوزات العيادة (${pcNotified.length})
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn no-print" onclick="event.stopPropagation(); UI.printSpecificFollowUpList('pcNotified')" style="padding:4px 10px; font-size:0.8rem; background:white; color:#0369a1; border:1px solid #bae6fd; border-radius:6px;">🖨️ طباعة</button>
+                            <span id="pc-followup-arrow" style="transition: transform 0.3s; transform: rotate(180deg); font-size: 1.2rem;">▼</span>
+                        </div>
+                    </div>
+                    <div id="pc-followup-content" style="display:block; overflow-x:auto; background:white;">
+                        <table style="width:100%; border-collapse:collapse; min-width:800px;">
+                            <thead>
+                                <tr style="background:#f8fafc; color:var(--text-muted); text-align:right; font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">
+                                    <th style="padding:15px; font-weight:900;">المريض / الكود</th>
+                                    <th style="padding:15px; font-weight:900;">الجهة (الطبيب)</th>
+                                    <th style="padding:15px; font-weight:900;">مهمة المتابعة المطلوبة</th>
+                                    <th style="padding:15px; font-weight:900;">تاريخ الجلسة</th>
+                                    <th style="padding:15px; font-weight:900; text-align:left;">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pcNotified.length > 0 ? generateRows(pcNotified) : '<tr><td colspan="5" style="text-align:center; padding:40px; color:#94a3b8; font-size:1.1rem;">لا توجد مهام متابعة معلقة حالياً من العيادة.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
+                <div style="background:#fdf4ff; border-bottom:2px solid #f5d0fe;">
+                    <div onclick="const content = document.getElementById('nc-followup-content'); const arrow = document.getElementById('nc-followup-arrow'); if(content.style.display==='none'){content.style.display='block'; arrow.style.transform='rotate(180deg)';}else{content.style.display='none'; arrow.style.transform='rotate(0deg)';}" style="padding:15px 25px; color:#a21caf; font-weight:900; font-size:1.1rem; border-bottom:1px solid #fae8ff; display:flex; align-items:center; justify-content:space-between; cursor:pointer; transition: background 0.2s;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            📋 قائمة المتابعة - من الحالات الجديدة (${ncNotified.length})
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn no-print" onclick="event.stopPropagation(); UI.printSpecificFollowUpList('ncNotified')" style="padding:4px 10px; font-size:0.8rem; background:white; color:#a21caf; border:1px solid #f5d0fe; border-radius:6px;">🖨️ طباعة</button>
+                            <span id="nc-followup-arrow" style="transition: transform 0.3s; transform: rotate(180deg); font-size: 1.2rem;">▼</span>
+                        </div>
+                    </div>
+                    <div id="nc-followup-content" style="display:block; overflow-x:auto; background:white;">
+                        <table style="width:100%; border-collapse:collapse; min-width:800px;">
+                            <thead>
+                                <tr style="background:#f8fafc; color:var(--text-muted); text-align:right; font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">
+                                    <th style="padding:15px; font-weight:900;">المريض / الكود</th>
+                                    <th style="padding:15px; font-weight:900;">الطبيب المعالج</th>
+                                    <th style="padding:15px; font-weight:900;">مهمة المتابعة المطلوبة</th>
+                                    <th style="padding:15px; font-weight:900;">تاريخ اللجنة</th>
+                                    <th style="padding:15px; font-weight:900; text-align:left;">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${ncNotified.length > 0 ? generateRows(ncNotified) : '<tr><td colspan="5" style="text-align:center; padding:40px; color:#94a3b8; font-size:1.1rem;">لا توجد مهام متابعة معلقة حالياً من لجنة الحالات الجديدة.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>`;
             
         if (isFocused) {
@@ -2990,62 +3350,178 @@ Oncology Coordinator System`;
         }
     },
 
-    _updateFollowUp: async function(id, status, notes) {
-        UI.showSaving();
-        let allData = await API.getPostClinicBookings();
-        let row = allData.find(r => r.id === id);
-        if(!row) return;
+    startFollowUp: function(id, source = 'PC') {
+        UI.showModal(
+            "🚶 طلب متابعة جديدة",
+            `
+            <div style="padding:10px 0;">
+                <label style="display:block; font-weight:bold; margin-bottom:10px; color:#92400e; font-size:1.1rem;">ما هي مهمة المتابعة المطلوبة لهذا المريض؟</label>
+                <textarea id="followup-notes-input" class="pc-input" style="width:100%; min-height:100px; resize:vertical; background:#fffbeb; border:2px solid #fde68a; padding:12px; font-size:1rem;" placeholder="مثال: حجز موعد أشعة، التأكد من فحص الدم..."></textarea>
+            </div>
+            `,
+            () => {
+                const notes = document.getElementById('followup-notes-input').value.trim();
+                if (!notes) {
+                    UI.showToast("يجب إدخال مهمة المتابعة", "error");
+                    return;
+                }
+                document.getElementById('app-modal').remove();
+                this._updateFollowUp(id, 'ACTIVE', notes, source);
+            }
+        );
+    },
 
-        row.followUpStatus = status;
-        if (notes !== undefined) row.followUpNotes = notes;
+    _updateFollowUp: async function(id, status, notes, source = 'PC') {
+        UI.showSaving();
         
-        await API.updatePostClinicBooking(row);
+        let isNC = source === 'NC';
+        
+        if (isNC) {
+            let allDataNC = await API.getNewCasesMeeting();
+            let row = allDataNC.find(r => String(r.id).trim() === String(id).trim());
+            if(!row) {
+                UI.showToast("خطأ: لم يتم العثور على المريض", "error");
+                UI.showSaved();
+                return;
+            }
+
+            let cData = this.parseNCCustomData(row.customData);
+            cData.followUpStatus = status;
+            if (notes !== undefined) cData.followUpNotes = notes;
+            row.customData = JSON.stringify(cData);
+
+            this._followUpCache = null;
+            this._ncCache = null;
+            await API.updateNewCaseMeeting(row);
+        } else {
+            let allData = await API.getPostClinicBookings();
+            let row = allData.find(r => String(r.id).trim() === String(id).trim());
+            if(!row) {
+                UI.showToast("خطأ: لم يتم العثور على المريض", "error");
+                UI.showSaved();
+                return;
+            }
+
+            row.followUpStatus = status;
+            if (notes !== undefined) row.followUpNotes = notes;
+            
+            this._pcCache = null;
+            this._followUpCache = null;
+            this._masterRegistryCache = null;
+
+            await API.updatePostClinicBooking(row);
+        }
+
         UI.showToast(status === 'ACTIVE' ? "تم النقل لقسم المتابعة 🚶" : "تم إنهاء المهمة بنجاح ✅");
     },
 
-    finishFollowUp: async function(id, source = 'PC') {
-        const note = prompt("ماذا فعلت مع المريض لإغلاق هذه المهمة؟\\n(سيتم تسجيل هذا النص في خطة العلاج بلون مختلف)");
-        if (note === null) return; 
+    finishFollowUp: function(id, source = 'PC') {
+        UI.showModal(
+            "✅ إنهاء مهمة المتابعة",
+            `
+            <div style="padding:10px 0;">
+                <label style="display:block; font-weight:bold; margin-bottom:10px; color:#15803d; font-size:1.1rem;">ماذا فعلت مع المريض لإغلاق هذه المهمة؟</label>
+                <div style="font-size:0.85rem; color:#64748b; margin-bottom:12px;">(سيتم تسجيل هذا النص في خطة العلاج بلون مختلف)</div>
+                <textarea id="followup-finish-input" class="pc-input" style="width:100%; min-height:100px; resize:vertical; background:#f0fdf4; border:2px solid #86efac; padding:12px; font-size:1rem;" placeholder="مثال: تم التحدث مع المريض وتحديد موعد..."></textarea>
+            </div>
+            `,
+            async () => {
+                const note = document.getElementById('followup-finish-input').value.trim();
+                if (!note) {
+                    UI.showToast("يجب إدخال تفاصيل إنهاء المهمة", "error");
+                    return;
+                }
+                document.getElementById('app-modal').remove();
+                
+                UI.showSaving();
+                
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+                const followUpEntry = `\n<div style="color:#0369a1; font-weight:bold; margin-top:12px; border-top:1px dashed #bae6fd; padding-top:12px; font-size:0.95rem;">✅ تم إنهاء المهمة (${dateStr}):<br>${note}</div>`;
 
-        UI.showSaving();
-        
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
-        const followUpEntry = `\\n<div style="color:#0369a1; font-weight:bold; margin-top:12px; border-top:1px dashed #bae6fd; padding-top:12px; font-size:0.95rem;">✅ تم إنهاء المهمة (${dateStr}):<br>${note}</div>`;
+                if (source === 'PC') {
+                    let allData = await API.getPostClinicBookings();
+                    let row = allData.find(r => r.id === id);
+                    if(!row) return;
 
-        if (source === 'PC') {
-            let allData = await API.getPostClinicBookings();
-            let row = allData.find(r => r.id === id);
-            if(!row) return;
+                    row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
+                    row.followUpStatus = 'FINISHED';
+                    row.followUpNotes = null;
+                    row.notifiedPatient = 'Y';
+                    this._masterRegistryCache = null;
+                    this._followUpCache = null;
+                    await API.updatePostClinicBooking(row);
+                } else if (source === 'NC') {
+                    let allDataNC = await API.getNewCasesMeeting();
+                    let row = allDataNC.find(r => r.id === id);
+                    if(!row) return;
 
-            row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
-            row.followUpStatus = 'FINISHED';
-            row.followUpNotes = null;
-            row.notifiedPatient = 'Y';
-            this._masterRegistryCache = null;
-            this._followUpCache = null;
-            await API.updatePostClinicBooking(row);
-        } else if (source === 'NC') {
-            let allDataNC = await API.getNewCasesMeeting();
-            let row = allDataNC.find(r => r.id === id);
-            if(!row) return;
+                    row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
+                    let cData = this.parseNCCustomData(row.customData);
+                    cData.followUpStatus = 'FINISHED';
+                    cData.followUpNotes = null;
+                    cData.notifiedPatient = 'Y';
+                    row.customData = JSON.stringify(cData);
+                    this._followUpCache = null;
+                    this._ncCache = null;
+                    await API.updateNewCaseMeeting(row);
+                }
+                
+                UI.showToast("تم توثيق الإجراء وإغلاق المهمة بنجاح ✅");
+            }
+        );
+    },
 
-            row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
-            let cData = this.parseNCCustomData(row.customData);
-            cData.followUpStatus = 'FINISHED';
-            cData.followUpNotes = null;
-            cData.notifiedPatient = 'Y';
-            row.customData = JSON.stringify(cData);
-            this._followUpCache = null;
-            await API.updateNewCaseMeeting(row);
-        }
-        
-        UI.showToast("تم توثيق الإجراء وإغلاق المهمة بنجاح ✅");
-        
-        const route = document.querySelector('.nav-links li.active')?.getAttribute('data-route');
-        if (route === 'follow-up') UI.renderFollowUpView();
-        else if (route === 'post-clinic') UI.renderPostClinicBookings();
-        else if (route === 'new-cases') UI.renderNewCasesMeeting();
+    printSpecificFollowUpList: async function(listType) {
+        let title = '';
+        if (listType === 'unnotified') title = 'مرضى بانتظار التبليغ العاجل';
+        else if (listType === 'awaitingAppt') title = 'مرضى بانتظار تحديد موعد';
+        else if (listType === 'pcNotified') title = 'قائمة المتابعة - من حجوزات العيادة';
+        else if (listType === 'ncNotified') title = 'قائمة المتابعة - من الحالات الجديدة';
+        else title = 'تقرير المتابعة';
+
+        this.showModal(`إعدادات طباعة ${title} 🖨️`, `
+            <div style="display:flex; flex-direction:column; gap:20px;">
+                <div>
+                    <label style="display:block; font-weight:800; margin-bottom:10px; color:var(--primary);">📏 وضعية الصفحة:</label>
+                    <div style="display:flex; gap:20px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:bold;">
+                            <input type="radio" name="print-orient" value="landscape" checked> بالعرض (Landscape)
+                        </label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:bold;">
+                            <input type="radio" name="print-orient" value="portrait"> بالطول (Portrait)
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display:block; font-weight:800; margin-bottom:10px; color:var(--primary);">🔤 حجم الخط:</label>
+                    <select id="print-font-size" class="pc-select" style="width:100%; padding:10px;">
+                        <option value="11px">صغير (Small)</option>
+                        <option value="13px" selected>متوسط (Normal)</option>
+                        <option value="15px">كبير (Large)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display:block; font-weight:800; margin-bottom:10px; color:var(--primary);">↔️ عرض عمود خطة العلاج:</label>
+                    <div style="background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">
+                        <select id="print-plan-width" class="pc-select" style="width:100%; border:none; background:transparent;">
+                            <option value="25%">متوازن (25%)</option>
+                            <option value="40%" selected>عريض (40%)</option>
+                            <option value="55%">عريض جداً (55%)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `, () => {
+            const orientation = document.querySelector('input[name="print-orient"]:checked').value;
+            const fontSize = document.getElementById('print-font-size').value;
+            const planWidth = document.getElementById('print-plan-width').value;
+            
+            document.getElementById('app-modal').remove();
+            UI.printFollowUpReport({ orientation, fontSize, planWidth, specificList: listType, titleOverride: title });
+        });
     },
 
     openPrintFollowUpSettings: function() {
@@ -3108,15 +3584,42 @@ Oncology Coordinator System`;
         pcData.forEach(b => {
             if(b.followUpStatus === 'ACTIVE') {
                 followUps.push({
-                    id: b.id,
+                    id: b.id, source: 'PC',
                     patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientCode || '---',
                     providerName: b.providerName || 'غير محدد',
                     sessionDate: b.sessionDate || '---',
                     followUpNotes: b.followUpNotes || 'لا توجد ملاحظات',
                     treatmentPlan: b.treatmentPlan || '',
-                    phoneNumber: b.phoneNumber || ''
+                    phoneNumber: b.phoneNumber || '',
+                    isUnnotified: false, isAwaitingAppt: false
                 });
+            } else if (b.notifiedPatient !== 'Y') {
+                if (b.opcDate && b.opcDate.trim() !== '') {
+                    followUps.push({
+                        id: b.id, source: 'PC',
+                        patientName: b.patientName || 'بدون اسم',
+                        patientCode: b.patientCode || '---',
+                        providerName: b.providerName || 'غير محدد',
+                        sessionDate: b.sessionDate || '---',
+                        followUpNotes: 'بانتظار تبليغ المريض',
+                        treatmentPlan: b.treatmentPlan || '',
+                        phoneNumber: b.phoneNumber || '',
+                        isUnnotified: true, isAwaitingAppt: false
+                    });
+                } else {
+                    followUps.push({
+                        id: b.id, source: 'PC',
+                        patientName: b.patientName || 'بدون اسم',
+                        patientCode: b.patientCode || '---',
+                        providerName: b.providerName || 'غير محدد',
+                        sessionDate: b.sessionDate || '---',
+                        followUpNotes: 'بانتظار تحديد موعد',
+                        treatmentPlan: b.treatmentPlan || '',
+                        phoneNumber: b.phoneNumber || '',
+                        isUnnotified: false, isAwaitingAppt: true
+                    });
+                }
             }
         });
 
@@ -3124,17 +3627,30 @@ Oncology Coordinator System`;
             let cData = this.parseNCCustomData(b.customData);
             if(cData.followUpStatus === 'ACTIVE') {
                 followUps.push({
-                    id: b.id,
+                    id: b.id, source: 'NC',
                     patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientId || '---',
                     providerName: b.primaryPhysician || 'غير محدد',
                     sessionDate: b.sessionDate || '---',
                     followUpNotes: cData.followUpNotes || 'لا توجد ملاحظات',
                     treatmentPlan: b.treatmentPlan || '',
-                    phoneNumber: b.phoneNumber || ''
+                    phoneNumber: b.phoneNumber || '',
+                    isUnnotified: false, isAwaitingAppt: false
                 });
             }
         });
+
+        if (settings.specificList) {
+            if (settings.specificList === 'unnotified') {
+                followUps = followUps.filter(f => f.isUnnotified);
+            } else if (settings.specificList === 'awaitingAppt') {
+                followUps = followUps.filter(f => f.isAwaitingAppt);
+            } else if (settings.specificList === 'pcNotified') {
+                followUps = followUps.filter(f => !f.isUnnotified && !f.isAwaitingAppt && f.source === 'PC');
+            } else if (settings.specificList === 'ncNotified') {
+                followUps = followUps.filter(f => !f.isUnnotified && !f.isAwaitingAppt && f.source === 'NC');
+            }
+        }
 
         followUps.sort((a,b) => new Date(a.sessionDate || 0) - new Date(b.sessionDate || 0));
 
@@ -3151,17 +3667,29 @@ Oncology Coordinator System`;
             return;
         }
 
-        let rowsHTML = filtered.map((b, idx) => `
+        let rowsHTML = filtered.map((b, idx) => {
+            let hasNotes = b.followUpNotes && b.followUpNotes.trim() !== '' && b.followUpNotes !== 'بانتظار تبليغ المريض' && b.followUpNotes !== 'بانتظار تحديد موعد';
+            let isSystemNote = b.followUpNotes === 'بانتظار تبليغ المريض' || b.followUpNotes === 'بانتظار تحديد موعد';
+            
+            let printTask = '';
+            if (hasNotes || isSystemNote) {
+                printTask = b.followUpNotes;
+            } else {
+                printTask = b.treatmentPlan ? b.treatmentPlan.replace(/<[^>]*>?/gm, '') : '';
+            }
+
+            return `
             <tr>
                 <td style="text-align:center;">${idx + 1}</td>
                 <td style="font-weight:bold;">${b.patientName || ''}</td>
                 <td style="font-family:monospace; text-align:center; font-size:11px;">${b.patientCode || ''}</td>
                 <td>د. ${b.providerName || ''}</td>
                 <td class="col-plan">${(b.treatmentPlan || '').replace(/<[^>]*>?/gm, '')}</td>
-                <td class="col-task">${b.followUpNotes || ''}</td>
+                <td class="col-task">${printTask}</td>
                 <td style="text-align:center;">${b.phoneNumber || ''}</td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
         let printHeader = UI.getPrintHeader();
         let htmlContent = `
@@ -3190,7 +3718,7 @@ Oncology Coordinator System`;
             </style></head>
             <body>
                 ${printHeader}
-                <div class="report-title">سجل متابعة المرضى النشطة 🚶</div>
+                <div class="report-title">${settings.titleOverride || 'سجل متابعة المرضى النشطة 🚶'}</div>
                 <table>
                     <thead>
                         <tr>

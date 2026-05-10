@@ -22,7 +22,7 @@ function setupDatabase() {
     "Admissions": ["patientName", "mrn", "date", "type", "location"],
     "PortCath": ["patientName", "status", "date"],
     "Communications": ["caseId", "type", "to", "date", "outcome"],
-    "PostClinicBookings": ["id", "patientName", "patientCode", "patientAge", "providerName", "treatmentPlan", "opcDate", "phoneNumber", "permit", "referral", "notifiedPatient", "sessionDate", "customData", "followUpStatus", "followUpNotes"],
+    "PostClinicBookings": ["id", "patientName", "patientCode", "patientAge", "providerName", "treatmentPlan", "opcDate", "phoneNumber", "permit", "referral", "notifiedPatient", "sessionDate", "customData", "followUpStatus", "followUpNotes", "specialistNoteUrl"],
     "NewCasesMeeting": ["id", "patientName", "patientId", "briefHistory", "treatmentPlan", "primaryPhysician", "notes", "sessionDate", "customData"]
   };
   
@@ -164,6 +164,23 @@ function doPost(e) {
         break;
       case 'UPDATE_POSTCLINIC':
         response.data = updateRowInTable("PostClinicBookings", payload.data);
+        response.success = true;
+        break;
+      case 'BATCH_UPDATE_POSTCLINIC':
+        response.data = batchUpdateRows("PostClinicBookings", payload.data);
+        response.success = true;
+        break;
+      case 'UPLOAD_IMAGE':
+        response.data = uploadImageToDrive(payload.filename, payload.base64);
+        response.success = true;
+        break;
+      case 'GET_IMAGE':
+        let fileToGet = DriveApp.getFileById(payload.fileId);
+        let imgBlob = fileToGet.getBlob();
+        response.data = {
+          mimeType: imgBlob.getContentType(),
+          base64: Utilities.base64Encode(imgBlob.getBytes())
+        };
         response.success = true;
         break;
       case 'DELETE_ROW':
@@ -453,3 +470,65 @@ function deleteProviderFromTable(sheetName, providerName, sessionDate) {
     lock.releaseLock();
   }
 }
+
+function uploadImageToDrive(filename, base64Data) {
+  try {
+    // Expected format: data:image/png;base64,iVBORw0KGgo...
+    let contentType = 'image/png';
+    let realData = base64Data;
+    if (base64Data.startsWith('data:')) {
+      contentType = base64Data.substring(5, base64Data.indexOf(';'));
+      realData = base64Data.substring(base64Data.indexOf(',') + 1);
+    }
+    const blob = Utilities.newBlob(Utilities.base64Decode(realData), contentType, filename);
+    const file = DriveApp.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return "https://drive.google.com/uc?export=view&id=" + file.getId();
+  } catch(e) {
+    throw new Error("Failed to upload image: " + e.message);
+  }
+}
+
+function batchUpdateRows(sheetName, arr) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) throw new Error("Sheet not found: " + sheetName);
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { updatedCount: 0 };
+    
+    const headers = data[0];
+    let idIndex = headers.indexOf("id");
+    if(idIndex === -1) throw new Error("No id column found in " + sheetName);
+    
+    let rowMap = {};
+    for(let i = 1; i < data.length; i++) {
+      rowMap[String(data[i][idIndex]).trim()] = i;
+    }
+
+    let updatedCount = 0;
+    arr.forEach(obj => {
+      let targetId = String(obj.id).trim();
+      let rIdx = rowMap[targetId];
+      if (rIdx !== undefined) {
+        let updatedRow = headers.map(h => obj[h.trim()] !== undefined ? obj[h.trim()] : data[rIdx][headers.indexOf(h)]);
+        data[rIdx] = updatedRow;
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+    }
+    
+    return { updatedCount: updatedCount };
+  } catch(e) {
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+}
+

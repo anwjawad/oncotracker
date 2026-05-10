@@ -458,23 +458,53 @@ const UI = {
         }, 3500);
     },
 
-    showModal: function(title, contentHTML, onSave) {
+    showModal: function(title, contentHTML, onSave, isViewOnly = false) {
         let modalHTML = `
             <div id="app-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); display:flex; justify-content:center; align-items:center; z-index:1000; direction:rtl;">
                 <div class="card" style="width: 550px; max-width: 95%; box-shadow:var(--shadow-lg); animation:fadein 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); padding:40px;">
                     <h3 style="font-size: 1.6rem; font-weight:800; margin-bottom: 32px; color:var(--primary); border-bottom:2px solid var(--border); padding-bottom:16px;">${title}</h3>
-                    <div style="margin: 24px 0;">${contentHTML}</div>
+                    <div style="margin: 24px 0; max-height: 70vh; overflow-y: auto; text-align: center;">${contentHTML}</div>
                     <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:40px;">
-                        <button class="btn" style="background:var(--border); color:var(--text-main); font-weight:800;" onclick="document.getElementById('app-modal').remove()">إلغاء الأمر</button>
-                        <button class="btn btn-primary" id="modal-save-btn" style="font-weight:800; padding:12px 32px;">حفظ واعتماد</button>
+                        ${isViewOnly ? 
+                            `<button class="btn btn-primary" style="font-weight:800; padding:12px 32px;" onclick="document.getElementById('app-modal').remove()">إغلاق</button>` :
+                            `<button class="btn" style="background:var(--border); color:var(--text-main); font-weight:800;" onclick="document.getElementById('app-modal').remove()">إلغاء الأمر</button>
+                             <button class="btn btn-primary" id="modal-save-btn" style="font-weight:800; padding:12px 32px;">حفظ واعتماد</button>`
+                        }
                     </div>
                 </div>
             </div>
         `;
         document.getElementById('modal-root').innerHTML = modalHTML;
-        document.getElementById('modal-save-btn').onclick = () => {
-            onSave();
-        };
+        if (!isViewOnly && document.getElementById('modal-save-btn')) {
+            document.getElementById('modal-save-btn').onclick = () => {
+                if(onSave) onSave();
+            };
+        }
+    },
+
+    showImagePreview: async function(url) {
+        let fileId = null;
+        if (url && url.includes('drive.google.com')) {
+            const match = url.match(/(?:\/d\/|id=)([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) fileId = match[1];
+        }
+
+        if (fileId) {
+            this.showModal('صورة الملاحظة', `<div id="img-preview-container" style="text-align:center;"><div class="spinner" style="margin:40px auto; border-top-color:var(--primary);"></div><p style="font-weight:bold; color:var(--text-main);">جاري تحميل الصورة...</p></div>`, null, true);
+            try {
+                const imgData = await API.getImageFromDrive(fileId);
+                if (imgData && imgData.base64) {
+                    const src = `data:${imgData.mimeType};base64,${imgData.base64}`;
+                    document.getElementById('img-preview-container').innerHTML = `<img src="${src}" style="max-width:100%; max-height:70vh; border-radius:8px; border:1px solid #e2e8f0; box-shadow:var(--shadow-md);">`;
+                } else {
+                    document.getElementById('img-preview-container').innerHTML = `<p style="color:var(--danger); font-weight:bold;">فشل تحميل الصورة ❌</p>`;
+                }
+            } catch(e) {
+                document.getElementById('img-preview-container').innerHTML = `<p style="color:var(--danger); font-weight:bold;">فشل تحميل الصورة ❌</p>`;
+            }
+        } else {
+            this.showModal('صورة الملاحظة', `<img src="${url}" style="max-width:100%; max-height:70vh; border-radius:8px; border:1px solid #e2e8f0;">`, null, true);
+        }
     },
 
     handleSmartPaste: function(text, context) {
@@ -1325,12 +1355,14 @@ Oncology Coordinator System`;
         let dynamicFields = this.pcCustomColumns.map(col => `
              <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; margin-bottom:4px;">
                  <label style="font-size:0.8rem; color:var(--text-muted); font-weight:800; margin:0;">${col}</label>
-                 <input type="text" class="pc-input" value="${customData[col] || ''}" onchange="UI.updatePCRow('${b.id}', 'custom_${col}', this.value)" style="background:#fff; width:65%; padding:4px 6px; font-size:0.85rem;">
+                 <span style="background:#fff; width:65%; padding:4px 6px; font-size:0.85rem; border:1px dashed #cbd5e1;">${customData[col] || ''}</span>
              </div>
          `).join('');
 
+        let noteIcon = b.specialistNoteUrl ? `<span title="عرض الملاحظة" onclick="event.stopPropagation(); UI.showImagePreview('${b.specialistNoteUrl}')" style="cursor:pointer; background:#dbeafe; color:#1e3a8a; padding:4px 8px; border-radius:6px; font-size:0.8rem; margin-right:8px;">🖼️ مرفق</span>` : '';
+
         return `
-         <div class="pc-dossier-card" id="tr-${b.id}" style="background:#fff; border:1px solid ${inFollowUp ? '#fbbf24' : 'var(--border)'}; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; min-width:300px; max-width: 100%; position:relative; overflow:hidden;">
+         <div class="pc-dossier-card" id="tr-${b.id}" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'SELECT' && event.target.tagName !== 'A') UI.editPostClinicRow('${b.id}')" style="cursor:pointer; background:#fff; border:1px solid ${inFollowUp ? '#fbbf24' : 'var(--border)'}; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; min-width:300px; max-width: 100%; position:relative; overflow:hidden; transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
              
              <!-- Badge: Meeting -->
              ${isRegisteredInMeeting ? `
@@ -1358,7 +1390,7 @@ Oncology Coordinator System`;
                      </div>
                     ${isRegisteredInMeeting ? '<span style="color:#0d9488; font-size:1.2rem;" title="تلقائي: تم تحويل المريض للجنة">🔘</span>' : ''}
                  </div>
-                 <textarea class="pc-input pc-name-input" onchange="UI.updatePCRow('${b.id}', 'patientName', this.value)" style="resize:vertical; min-height:45px; height:45px; font-size:1.15rem; font-weight:800; color:#0f766e; background:#f0fdfa; border:2px solid #0d9488;" oninput="this.style.height=''; this.style.height=this.scrollHeight+'px'">${b.patientName || ''}</textarea>
+                 <div style="min-height:45px; font-size:1.15rem; font-weight:800; color:#0f766e; background:#f0fdfa; border:2px solid #0d9488; padding:8px; border-radius:6px; white-space:pre-wrap;">${b.patientName || ''}</div>
              </div>
 
              ${inFollowUp && b.followUpNotes ? `
@@ -1371,63 +1403,56 @@ Oncology Coordinator System`;
              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                  <div style="display:flex; flex-direction:column;">
                      <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Code</label>
-                     <input type="text" class="pc-input" value="${b.patientCode || ''}" onchange="UI.updatePCRow('${b.id}', 'patientCode', this.value)" style="font-family:monospace; font-weight:700;">
+                     <span style="font-family:monospace; font-weight:700; padding:4px;">${b.patientCode || ''}</span>
                  </div>
                  <div style="display:flex; flex-direction:column;">
                      <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Age</label>
-                     <input type="text" class="pc-input" value="${b.patientAge || ''}" onchange="UI.updatePCRow('${b.id}', 'patientAge', this.value)" style="text-align:center;">
+                     <span style="text-align:center; padding:4px;">${b.patientAge || ''}</span>
                  </div>
              </div>
              <div style="display:flex; flex-direction:column;">
                  <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">Phone</label>
-                 <input type="text" class="pc-input" value="${b.phoneNumber || ''}" onchange="UI.updatePCRow('${b.id}', 'phoneNumber', this.value)" style="direction:ltr;">
+                 <span style="direction:ltr; padding:4px;">${b.phoneNumber || ''}</span>
              </div>
              <div style="display:flex; flex-direction:column;">
                  <label style="font-size:0.85rem; color:var(--text-muted); font-weight:800; margin-bottom:4px;">👨‍⚕️ Provider (Doctor)</label>
-                 <input type="text" class="pc-input" value="${b.providerName || ''}" onchange="UI.updatePCRow('${b.id}', 'providerName', this.value)" style="background:#f1f5f9; font-weight:700;">
+                 <span style="background:#f1f5f9; font-weight:700; padding:6px; border-radius:4px;">${b.providerName || ''}</span>
              </div>
              <div style="display:flex; flex-direction:column;">
-                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                 <div style="display:flex; align-items:center; margin-bottom:8px;">
                     <label style="font-size:0.95rem; color:#b45309; font-weight:900; margin:0;">📋 Treatment Plan</label>
+                    ${noteIcon}
                  </div>
-                 <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'treatmentPlan', this.value)" style="resize:vertical; min-height:120px; width:100%; border:2px solid #f59e0b; background:#fffbeb; font-size:1.1rem; font-weight:600; color:#92400e; line-height:1.6; padding:10px; border-radius:8px;" placeholder="اكتب خطة العلاج هنا...">${b.treatmentPlan || ''}</textarea>
+                 <div style="min-height:120px; width:100%; border:2px solid #f59e0b; background:#fffbeb; font-size:1.1rem; font-weight:600; color:#92400e; line-height:1.6; padding:10px; border-radius:8px; white-space:pre-wrap;">${b.treatmentPlan || ''}</div>
              </div>
              <div style="display:flex; flex-direction:column; gap:12px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-top:auto;">
-                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
-                     <input type="checkbox" ${b.notifiedPatient === 'Y' ? 'checked' : ''} onchange="UI.updatePCRow('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')" style="transform:scale(1.2);">
+                 <label style="display:flex; align-items:center; gap:8px; margin:0;">
+                     <input type="checkbox" disabled ${b.notifiedPatient === 'Y' ? 'checked' : ''} style="transform:scale(1.2);">
                      <strong style="color:var(--primary); font-size:0.9rem;">تم التبليغ ✅</strong>
                  </label>
                  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                      <strong style="font-size:0.85rem; color:var(--text-muted);">OPC Appt:</strong>
-                     <input type="date" class="pc-input" style="padding:4px 6px; font-size:0.85rem; width:150px;" value="${b.opcDate || ''}" onchange="UI.updatePCRow('${b.id}', 'opcDate', this.value)">
+                     <span style="padding:4px 6px; font-size:0.85rem; width:150px; background:#fff; border:1px dashed #cbd5e1;">${b.opcDate || ''}</span>
                  </div>
                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                      <div style="display:flex; align-items:center; gap:4px;">
                          <label style="margin:0; font-size:0.8rem; font-weight:800; color:var(--text-muted);">Permit:</label>
-                         <select class="pc-select ${b.permit === 'Y' ? 'yes' : b.permit === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'permit', this.value)" style="padding:4px; font-size:0.8rem; flex:1;">
-                             <option value="">-</option>
-                             <option value="Y" ${b.permit === 'Y' ? 'selected' : ''}>Y</option>
-                             <option value="N" ${b.permit === 'N' ? 'selected' : ''}>N</option>
-                         </select>
+                         <span style="padding:4px; font-size:0.8rem; font-weight:bold;">${b.permit || '-'}</span>
                      </div>
                      <div style="display:flex; align-items:center; gap:4px;">
                          <label style="margin:0; font-size:0.8rem; font-weight:800; color:var(--text-muted);">Referral:</label>
-                         <select class="pc-select ${b.referral === 'Y' ? 'yes' : b.referral === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'referral', this.value)" style="padding:4px; font-size:0.8rem; flex:1;">
-                             <option value="">-</option>
-                             <option value="Y" ${b.referral === 'Y' ? 'selected' : ''}>Y</option>
-                             <option value="N" ${b.referral === 'N' ? 'selected' : ''}>N</option>
-                         </select>
+                         <span style="padding:4px; font-size:0.8rem; font-weight:bold;">${b.referral || '-'}</span>
                      </div>
                  </div>
                  ${dynamicFields}
                  
                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; border-top:1px solid #f1f5f9; padding-top:12px;">
                      ${!inFollowUp ? `
-                         <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
+                         <button class="btn" onclick="event.stopPropagation(); UI.startFollowUp('${b.id}', 'PC')" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;">🚶 متابعة</button>
                      ` : `
-                         <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.finishFollowUp('${b.id}')">✅ انتهاء المهمة</button>
+                         <button class="btn" onclick="event.stopPropagation(); UI.finishFollowUp('${b.id}')" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;">✅ انتهاء المهمة</button>
                      `}
-                     <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;" onclick="UI.deletePCRow('${b.id}')">🗑️ حذف الملف</button>
+                     <button class="btn" onclick="event.stopPropagation(); UI.deletePCRow('${b.id}')" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;">🗑️ حذف الملف</button>
                  </div>
              </div>
          </div>
@@ -1444,20 +1469,20 @@ Oncology Coordinator System`;
             if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
             dynamicFields = this.pcCustomColumns.map(col => `
                 <td style="padding:12px 15px;">
-                    <input type="text" class="pc-input" value="${customData[col] || ''}" 
-                           onchange="UI.updatePCRow('${b.id}', 'custom_${col}', this.value)"
-                           style="width:100%; border:none; background:transparent; font-size:0.85rem;">
+                    <span style="width:100%; border:none; background:transparent; font-size:0.85rem;">${customData[col] || ''}</span>
                 </td>
             `).join('');
         }
 
+        let noteIcon = b.specialistNoteUrl ? `<span title="عرض الملاحظة" onclick="event.stopPropagation(); UI.showImagePreview('${b.specialistNoteUrl}')" style="cursor:pointer; background:#dbeafe; color:#1e3a8a; padding:2px 4px; border-radius:4px; font-size:0.75rem; margin-top:4px; display:inline-block;">🖼️ مرفق</span>` : '';
+
         return `
-        <tr id="tr-${b.id}" style="border-bottom:1px solid #f1f5f9; transition:background 0.2s; vertical-align:top;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+        <tr id="tr-${b.id}" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'SELECT' && event.target.tagName !== 'A' && event.target.tagName !== 'SPAN') UI.editPostClinicRow('${b.id}')" style="border-bottom:1px solid #f1f5f9; transition:background 0.2s; vertical-align:top; cursor:pointer;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
             <td style="padding:12px 15px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="checkbox" class="pc-selection-checkbox" data-id="${b.id}" ${(UI.selectedPostClinicIds || []).includes(b.id) ? 'checked' : ''} onchange="UI.handlePCSelection('${b.id}', this.checked)" style="width:18px; height:18px; accent-color:#0d9488;">
                     <div>
-                        <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'patientName', this.value)" style="font-weight:900; color:#0f766e; background:transparent; border:none; width:180px; resize:none; font-size:0.95rem;">${b.patientName || ''}</textarea>
+                        <div style="font-weight:900; color:#0f766e; background:transparent; border:none; width:180px; font-size:0.95rem; white-space:pre-wrap;">${b.patientName || ''}</div>
                         ${isRegisteredInMeeting ? '<div style="font-size:0.65rem; color:#0d9488; font-weight:bold; margin-top:2px;">✅ مسجل باللجنة</div>' : ''}
                         ${inFollowUp ? '<div style="font-size:0.65rem; color:#b45309; font-weight:bold; margin-top:2px;">⏳ قيد المتابعة</div>' : ''}
                     </div>
@@ -1465,37 +1490,30 @@ Oncology Coordinator System`;
             </td>
             <td style="padding:12px 15px;">
                 <div style="display:flex; flex-direction:column; gap:4px;">
-                    <input type="text" class="pc-input" value="${b.patientCode || ''}" onchange="UI.updatePCRow('${b.id}', 'patientCode', this.value)" placeholder="MRN" style="font-family:monospace; font-size:0.8rem; width:90px; border:none; background:transparent; font-weight:700;">
-                    <input type="text" class="pc-input" value="${b.patientAge || ''}" onchange="UI.updatePCRow('${b.id}', 'patientAge', this.value)" placeholder="العمر" style="font-size:0.8rem; width:90px; border:none; background:transparent;">
+                    <span style="font-family:monospace; font-size:0.8rem; width:90px; border:none; background:transparent; font-weight:700;">${b.patientCode || ''}</span>
+                    <span style="font-size:0.8rem; width:90px; border:none; background:transparent;">${b.patientAge || ''}</span>
                 </div>
             </td>
             <td style="padding:12px 15px;">
                 <div style="display:flex; flex-direction:column; gap:4px;">
-                    <input type="text" class="pc-input" value="${b.providerName || ''}" onchange="UI.updatePCRow('${b.id}', 'providerName', this.value)" style="font-weight:700; border:none; background:transparent; width:130px; font-size:0.9rem;">
-                    <input type="text" class="pc-input" value="${b.phoneNumber || ''}" onchange="UI.updatePCRow('${b.id}', 'phoneNumber', this.value)" placeholder="الهاتف" style="font-size:0.8rem; border:none; background:transparent; direction:ltr;">
+                    <span style="font-weight:700; border:none; background:transparent; width:130px; font-size:0.9rem;">${b.providerName || ''}</span>
+                    <span style="font-size:0.8rem; border:none; background:transparent; direction:ltr;">${b.phoneNumber || ''}</span>
                 </div>
             </td>
             <td style="padding:12px 15px;">
-                <textarea class="pc-input" onchange="UI.updatePCRow('${b.id}', 'treatmentPlan', this.value)" style="width:100%; min-height:70px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:0.95rem; padding:8px; line-height:1.4; color:#92400e; font-weight:600;">${b.treatmentPlan || ''}</textarea>
+                <div style="width:100%; min-height:70px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:0.95rem; padding:8px; line-height:1.4; color:#92400e; font-weight:600; white-space:pre-wrap;">${b.treatmentPlan || ''}</div>
+                ${noteIcon}
             </td>
             <td style="padding:12px 15px;">
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <input type="checkbox" ${b.notifiedPatient === 'Y' ? 'checked' : ''} onchange="UI.updatePCRow('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')">
+                        <input type="checkbox" disabled ${b.notifiedPatient === 'Y' ? 'checked' : ''}>
                         <span style="font-size:0.8rem; font-weight:900; color:var(--primary);">تم التبليغ</span>
                     </div>
-                    <input type="date" class="pc-input" value="${b.opcDate || ''}" onchange="UI.updatePCRow('${b.id}', 'opcDate', this.value)" style="font-size:0.85rem; padding:4px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:4px; width:140px;">
+                    <span style="font-size:0.85rem; padding:4px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:4px; width:140px;">${b.opcDate || ''}</span>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                         <select class="pc-select ${b.permit === 'Y' ? 'yes' : b.permit === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'permit', this.value)" style="padding:2px; font-size:0.75rem;">
-                              <option value="">Permit</option>
-                              <option value="Y" ${b.permit === 'Y' ? 'selected' : ''}>Y</option>
-                              <option value="N" ${b.permit === 'N' ? 'selected' : ''}>N</option>
-                         </select>
-                         <select class="pc-select ${b.referral === 'Y' ? 'yes' : b.referral === 'N' ? 'no' : ''}" onchange="this.className='pc-select '+(this.value==='Y'?'yes':this.value==='N'?'no':''); UI.updatePCRow('${b.id}', 'referral', this.value)" style="padding:2px; font-size:0.75rem;">
-                              <option value="">Ref</option>
-                              <option value="Y" ${b.referral === 'Y' ? 'selected' : ''}>Y</option>
-                              <option value="N" ${b.referral === 'N' ? 'selected' : ''}>N</option>
-                         </select>
+                         <span style="padding:2px; font-size:0.75rem; font-weight:bold;">Permit: ${b.permit || '-'}</span>
+                         <span style="padding:2px; font-size:0.75rem; font-weight:bold;">Ref: ${b.referral || '-'}</span>
                     </div>
                 </div>
             </td>
@@ -1503,11 +1521,11 @@ Oncology Coordinator System`;
             <td style="padding:12px 15px;">
                 <div style="display:flex; flex-direction:column; gap:6px; justify-content:center;">
                      ${!inFollowUp ? `
-                        <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
+                        <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
                     ` : `
-                        <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="UI.finishFollowUp('${b.id}')">✅ انتهاء</button>
+                        <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.finishFollowUp('${b.id}')">✅ انتهاء</button>
                     `}
-                    <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="UI.deletePCRow('${b.id}')">🗑️ حذف</button>
+                    <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.deletePCRow('${b.id}')">🗑️ حذف</button>
                 </div>
             </td>
         </tr>
@@ -1664,6 +1682,7 @@ Oncology Coordinator System`;
                         </div>
 
                         <button class="btn btn-primary" style="background:#10b981; color:white; border:none; border-radius:8px; padding:10px 16px;" onclick="document.getElementById('excel-import').click()">📥 استيراد Excel</button>
+                        <button class="btn btn-primary" style="background:#0284c7; color:white; border:none; border-radius:8px; padding:10px 16px;" onclick="UI.openBulkAddPhonesModal()">📞 إضافة هواتف النواقص</button>
                         <button class="btn btn-primary" style="border:1px solid var(--border); border-radius:8px; padding:10px 16px; background:#fff; color:var(--text);" onclick="UI.addPCColumn()">+ مساحة مخصصة</button>
                         <button class="btn btn-primary" onclick="UI.printPostClinicTable(false)" style="background:#334155; border:none; border-radius:8px; padding:10px 16px; color:#fff;" title="طباعة العيادة الحالية فقط">🖨️ طباعة للجنة</button>
                         <button class="btn btn-primary" onclick="UI.printPostClinicTable(true)" style="background:#1e293b; border:none; border-radius:8px; padding:10px 16px; color:#fff;" title="طباعة كافة المرضى لجميع الأطباء في كشف واحد">🖨️ طباعة كافة العيادات</button>
@@ -1768,6 +1787,304 @@ Oncology Coordinator System`;
             UI.showToast("فشل في مسح البيانات", "error");
             UI.renderPostClinicBookings();
         }
+    },
+
+    openBulkAddPhonesModal: function() {
+        if (!this._pcCache) return;
+        let activeData = this._pcCache.filter(b => 
+            ((b.providerName ? String(b.providerName).trim() : 'غير محدد') === this.activePCTab) && 
+            (b.sessionDate === window.globalArchiveDate || (!b.sessionDate && window.globalArchiveDate === new Date().toISOString().split('T')[0]))
+        );
+        let missingPhones = activeData.filter(b => !b.phoneNumber || String(b.phoneNumber).trim() === '');
+        if (missingPhones.length === 0) {
+            UI.showToast("لا يوجد مرضى بدون رقم هاتف في هذا التبويب 👏", "success");
+            return;
+        }
+
+        let inputsHTML = missingPhones.map(b => `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding:8px 0;">
+                <span style="font-weight:bold; color:var(--primary);">${b.patientName} ${b.patientCode ? '('+b.patientCode+')' : ''}</span>
+                <input type="text" id="bulk-phone-${b.id}" placeholder="أدخل رقم الهاتف..." style="padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1; direction:ltr; width:180px;">
+            </div>
+        `).join('');
+
+        let formHTML = `
+            <div style="padding:10px; max-height:400px; overflow-y:auto;">
+                <p style="color:#64748b; font-size:0.9rem; margin-bottom:12px;">أدخل أرقام الهواتف للمرضى التالية أسماؤهم، ثم اضغط حفظ واعتماد لتحديثهم دفعة واحدة.</p>
+                ${inputsHTML}
+            </div>
+        `;
+
+        this.showModal('📞 إضافة هواتف النواقص', formHTML, async () => {
+            let updates = [];
+            missingPhones.forEach(b => {
+                let val = document.getElementById('bulk-phone-' + b.id).value.trim();
+                if (val) {
+                    let updated = { ...b, phoneNumber: val };
+                    updates.push(updated);
+                }
+            });
+
+            if (updates.length === 0) {
+                document.getElementById('app-modal').remove();
+                return;
+            }
+
+            UI.showSaving();
+            try {
+                await API.batchUpdatePostClinicBookings(updates);
+                document.getElementById('app-modal').remove();
+                this._pcCache = null;
+                UI.renderPostClinicBookings();
+                UI.showSaved();
+                UI.showToast(`تم تحديث ${updates.length} هاتف بنجاح ✅`);
+            } catch(e) {
+                UI.showToast("فشل الحفظ", "error");
+            }
+        });
+    },
+
+    openBulkAddPhonesModalRegistry: function() {
+        if (!this._masterRegistryCache) return;
+        
+        let allData = this._masterRegistryCache;
+        let query = (this.masterRegistrySearchQuery || '').toLowerCase().trim();
+        
+        let filtered = allData.filter(b => 
+            String(b.patientName || '').toLowerCase().includes(query) || 
+            String(b.patientCode || '').includes(query) ||
+            String(b.treatmentPlan || '').toLowerCase().includes(query)
+        );
+
+        let tabData = this.masterRegistryActiveTab === 'ALL' 
+            ? filtered 
+            : filtered.filter(b => (String(b.providerName || 'غير محدد').trim()) === this.masterRegistryActiveTab);
+
+        let missingPhones = tabData.filter(b => !b.phoneNumber || String(b.phoneNumber).trim() === '');
+        
+        if (missingPhones.length === 0) {
+            UI.showToast("لا يوجد مرضى بدون رقم هاتف في النتائج الحالية 👏", "success");
+            return;
+        }
+
+        let inputsHTML = missingPhones.map(b => `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding:8px 0;">
+                <span style="font-weight:bold; color:var(--primary);">${b.patientName} ${b.patientCode ? '('+b.patientCode+')' : ''} - د.${b.providerName || 'غير محدد'}</span>
+                <input type="text" id="bulk-phone-reg-${b.id}" placeholder="أدخل رقم الهاتف..." style="padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1; direction:ltr; width:180px;">
+            </div>
+        `).join('');
+
+        let formHTML = `
+            <div style="padding:10px; max-height:400px; overflow-y:auto;">
+                <p style="color:#64748b; font-size:0.9rem; margin-bottom:12px;">أدخل أرقام الهواتف للمرضى التالية أسماؤهم، ثم اضغط حفظ واعتماد لتحديثهم دفعة واحدة.</p>
+                ${inputsHTML}
+            </div>
+        `;
+
+        this.showModal('📞 إضافة هواتف النواقص (السجل)', formHTML, async () => {
+            let updates = [];
+            missingPhones.forEach(b => {
+                let val = document.getElementById('bulk-phone-reg-' + b.id).value.trim();
+                if (val) {
+                    let updated = { ...b, phoneNumber: val };
+                    updates.push(updated);
+                }
+            });
+
+            if (updates.length === 0) {
+                document.getElementById('app-modal').remove();
+                return;
+            }
+
+            UI.showSaving();
+            try {
+                await API.batchUpdatePostClinicBookings(updates);
+                document.getElementById('app-modal').remove();
+                
+                updates.forEach(upd => {
+                    let rIndex = this._masterRegistryCache.findIndex(x => x.id === upd.id);
+                    if (rIndex > -1) this._masterRegistryCache[rIndex] = upd;
+                    if (this._pcCache) {
+                        let pIndex = this._pcCache.findIndex(x => x.id === upd.id);
+                        if (pIndex > -1) this._pcCache[pIndex] = upd;
+                    }
+                });
+
+                this.renderMasterRegistry();
+                UI.showSaved();
+                UI.showToast(`تم تحديث ${updates.length} هاتف بنجاح ✅`);
+            } catch(e) {
+                UI.showToast("فشل الحفظ", "error");
+            }
+        });
+    },
+
+    editPostClinicRow: async function(id) {
+        if (!this._pcCache) return;
+        let b = this._pcCache.find(r => r.id === id);
+        if (!b) return;
+
+        let customData = {};
+        if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
+
+        let dynamicFieldsHTML = this.pcCustomColumns.map(col => `
+            <div>
+                <label style="font-weight:bold; margin-bottom:8px; display:block;">${col}</label>
+                <input type="text" id="pc-edit-custom-${col}" value="${customData[col] || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+            </div>
+        `).join('');
+
+        let formHTML = `
+            <div id="pc-edit-container" style="padding:10px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" tabindex="0">
+                <p style="grid-column: span 2; font-size:0.85rem; color:#64748b; margin:0; padding:8px; background:#f8fafc; border-radius:6px; border:1px dashed #cbd5e1;">
+                    ℹ️ يمكنك لصق (Ctrl+V) صورة ملاحظة أخصائي هنا مباشرة. سيتم رفعها تلقائياً.
+                </p>
+                <div style="grid-column: span 2;" id="pc-image-upload-status"></div>
+                <div style="grid-column: span 2; ${b.specialistNoteUrl ? '' : 'display:none;'}" id="pc-image-preview-container">
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">🖼️ صورة الملاحظة المرفقة:</label>
+                    <img id="pc-image-preview" src="${b.specialistNoteUrl || ''}" style="max-width:100%; max-height:200px; border-radius:8px; border:1px solid #e2e8f0;">
+                </div>
+
+                <div style="grid-column: span 2;">
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">👤 اسم المريض الكامل</label>
+                    <input type="text" id="pc-edit-name" value="${b.patientName || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+                
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">🔢 رقم الملف (MRN)</label>
+                    <input type="text" id="pc-edit-code" value="${b.patientCode || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">🎂 العمر</label>
+                    <input type="text" id="pc-edit-age" value="${b.patientAge || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">📞 رقم الهاتف</label>
+                    <input type="text" id="pc-edit-phone" value="${b.phoneNumber || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; direction:ltr;">
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">👨‍⚕️ اسم الطبيب</label>
+                    <input type="text" id="pc-edit-provider" value="${b.providerName || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div style="grid-column: span 2;">
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">📋 خطة العلاج (Treatment Plan)</label>
+                    <textarea id="pc-edit-plan" style="width:100%; height:80px; padding:10px; border:1px solid #ddd; border-radius:8px;">${b.treatmentPlan || ''}</textarea>
+                </div>
+
+                <div>
+                    <label style="font-weight:bold; margin-bottom:8px; display:block;">📅 موعد العيادة القادم</label>
+                    <input type="date" id="pc-edit-opc" value="${b.opcDate || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                </div>
+
+                <div style="display:flex; gap:10px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="font-weight:bold; margin-bottom:8px; display:block;">Permit</label>
+                        <select id="pc-edit-permit" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                            <option value="">-</option>
+                            <option value="Y" ${b.permit === 'Y' ? 'selected' : ''}>Y</option>
+                            <option value="N" ${b.permit === 'N' ? 'selected' : ''}>N</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-weight:bold; margin-bottom:8px; display:block;">Referral</label>
+                        <select id="pc-edit-referral" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                            <option value="">-</option>
+                            <option value="Y" ${b.referral === 'Y' ? 'selected' : ''}>Y</option>
+                            <option value="N" ${b.referral === 'N' ? 'selected' : ''}>N</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="grid-column: span 2;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="pc-edit-notified" ${b.notifiedPatient === 'Y' ? 'checked' : ''} style="transform:scale(1.2);">
+                        <strong style="color:var(--primary); font-size:0.9rem;">تم التبليغ ✅</strong>
+                    </label>
+                </div>
+
+                ${dynamicFieldsHTML}
+            </div>
+        `;
+
+        let currentNoteUrl = b.specialistNoteUrl || '';
+
+        this.showModal('تعديل ملف المريض', formHTML, async () => {
+            let pName = document.getElementById('pc-edit-name').value.trim();
+            if(!pName) { UI.showToast("يجب إدخال اسم المريض", "error"); return; }
+
+            let updatedCustomData = {};
+            this.pcCustomColumns.forEach(col => {
+                let el = document.getElementById('pc-edit-custom-' + col);
+                if(el) updatedCustomData[col] = el.value;
+            });
+
+            let updatedData = {
+                id: b.id,
+                patientName: pName,
+                patientCode: document.getElementById('pc-edit-code').value.trim(),
+                patientAge: document.getElementById('pc-edit-age').value.trim(),
+                providerName: document.getElementById('pc-edit-provider').value.trim(),
+                treatmentPlan: document.getElementById('pc-edit-plan').value.trim(),
+                opcDate: document.getElementById('pc-edit-opc').value,
+                phoneNumber: document.getElementById('pc-edit-phone').value.trim(),
+                permit: document.getElementById('pc-edit-permit').value,
+                referral: document.getElementById('pc-edit-referral').value,
+                notifiedPatient: document.getElementById('pc-edit-notified').checked ? 'Y' : 'N',
+                sessionDate: b.sessionDate,
+                customData: JSON.stringify(updatedCustomData),
+                followUpStatus: b.followUpStatus,
+                followUpNotes: b.followUpNotes,
+                specialistNoteUrl: currentNoteUrl
+            };
+
+            UI.showSaving();
+            try {
+                await API.updatePostClinicBooking(updatedData);
+                document.getElementById('app-modal').remove();
+                this._pcCache = null; 
+                UI.renderPostClinicBookings();
+                UI.showSaved();
+                UI.showToast("تم الحفظ واعتماد التعديلات بنجاح ✅");
+            } catch(e) {
+                UI.showToast("فشل الحفظ", "error");
+            }
+        });
+
+        setTimeout(() => {
+            const container = document.getElementById('pc-edit-container');
+            if (container) {
+                container.focus();
+                container.addEventListener('paste', async (e) => {
+                    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                    for (let index in items) {
+                        const item = items[index];
+                        if (item.kind === 'file' && item.type.indexOf('image/') !== -1) {
+                            const blob = item.getAsFile();
+                            const reader = new FileReader();
+                            reader.onload = async (event) => {
+                                const base64Data = event.target.result;
+                                document.getElementById('pc-image-upload-status').innerHTML = '<span style="color:#0284c7; font-weight:bold;">⏳ جاري رفع الصورة إلى Google Drive...</span>';
+                                try {
+                                    const filename = 'SpecialistNote_' + (b.patientCode || b.patientName) + '_' + new Date().getTime() + '.png';
+                                    const url = await API.uploadImageToDrive(base64Data, filename);
+                                    currentNoteUrl = url;
+                                    document.getElementById('pc-image-upload-status').innerHTML = '<span style="color:#16a34a; font-weight:bold;">✅ تم الرفع بنجاح! احفظ التغييرات للاعتماد.</span>';
+                                    document.getElementById('pc-image-preview').src = url;
+                                    document.getElementById('pc-image-preview-container').style.display = 'block';
+                                } catch (err) {
+                                    document.getElementById('pc-image-upload-status').innerHTML = '<span style="color:#dc2626; font-weight:bold;">❌ فشل رفع الصورة. تأكد من إعطاء الصلاحيات لـ DriveApp من خلال Apps Script.</span>';
+                                }
+                            };
+                            reader.readAsDataURL(blob);
+                        }
+                    }
+                });
+            }
+        }, 100);
     },
 
     addPostClinicRow: function() {
@@ -2971,7 +3288,10 @@ Oncology Coordinator System`;
             <div class="card">
                 <div style="margin-bottom:24px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <h3>سجل العيادات العام الحصري</h3>
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            <h3>سجل العيادات العام الحصري</h3>
+                            <button onclick="UI.openBulkAddPhonesModalRegistry()" class="btn btn-primary" style="background:#0284c7; font-weight:bold; font-size:0.9rem; padding:8px 16px; border-radius:8px;">📞 إضافة النواقص</button>
+                        </div>
                         <div style="position:relative; width:350px;">
                             <input type="text" id="registry-search" value="${this.masterRegistrySearchQuery}" 
                                    placeholder="ابحث بالاسم، رقم الملف، أو الخطة..." 

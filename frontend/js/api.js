@@ -220,6 +220,20 @@ const API = {
 
         return await this._fetchGAS('UPDATE_POSTCLINIC', { data: data });
     },
+    batchUpdatePostClinicBookings: async function(dataArray) {
+        if(!this._cache.postClinicBookings) return;
+        dataArray.forEach(data => {
+            let index = this._cache.postClinicBookings.findIndex(t => t.id === data.id);
+            if(index > -1) this._cache.postClinicBookings[index] = data;
+        });
+        return await this._fetchGAS('BATCH_UPDATE_POSTCLINIC', { data: dataArray });
+    },
+    uploadImageToDrive: async function(base64, filename) {
+        return await this._fetchGAS('UPLOAD_IMAGE', { base64: base64, filename: filename });
+    },
+    getImageFromDrive: async function(fileId) {
+        return await this._fetchGAS('GET_IMAGE', { fileId: fileId });
+    },
     deletePostClinicBooking: async function(id) {
         if(!this._cache || !this._cache.postClinicBookings) return;
         // Send to server FIRST, then update cache only on success

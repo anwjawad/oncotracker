@@ -76,6 +76,9 @@ document.addEventListener("DOMContentLoaded", () => {
             case 'post-clinic':
                 UI.renderPostClinicBookings();
                 break;
+            case 'recently-added':
+                UI.renderRecentlyAdded();
+                break;
             case 'master-registry':
                 UI.renderMasterRegistry();
                 break;

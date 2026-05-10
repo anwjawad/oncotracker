@@ -1360,9 +1360,11 @@ Oncology Coordinator System`;
          `).join('');
 
         let noteIcon = b.specialistNoteUrl ? `<span title="عرض الملاحظة" onclick="event.stopPropagation(); UI.showImagePreview('${b.specialistNoteUrl}')" style="cursor:pointer; background:#dbeafe; color:#1e3a8a; padding:4px 8px; border-radius:6px; font-size:0.8rem; margin-right:8px;">🖼️ مرفق</span>` : '';
+        
+        let isNoReferral = !b.referral || String(b.referral).trim().toUpperCase() === 'N';
 
         return `
-         <div class="pc-dossier-card" id="tr-${b.id}" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'SELECT' && event.target.tagName !== 'A') UI.editPostClinicRow('${b.id}')" style="cursor:pointer; background:#fff; border:1px solid ${inFollowUp ? '#fbbf24' : 'var(--border)'}; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; min-width:300px; max-width: 100%; position:relative; overflow:hidden; transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+         <div class="pc-dossier-card" id="tr-${b.id}" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'SELECT' && event.target.tagName !== 'A') UI.editPostClinicRow('${b.id}')" style="cursor:pointer; background:${isNoReferral ? '#fef2f2' : '#fff'}; border:1px solid ${inFollowUp ? '#fbbf24' : (isNoReferral ? '#fca5a5' : 'var(--border)')}; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 12px; min-width:300px; max-width: 100%; position:relative; overflow:hidden; transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
              
              <!-- Badge: Meeting -->
              ${isRegisteredInMeeting ? `
@@ -1387,6 +1389,7 @@ Oncology Coordinator System`;
                                 onchange="UI.handlePCSelection('${b.id}', this.checked)"
                                 style="width:20px; height:20px; cursor:pointer; accent-color:#0d9488;">
                          <label style="font-size:0.95rem; color:var(--primary); font-weight:900; margin:0;">👤 Patient Name</label>
+                         ${isNoReferral ? '<span style="background:#fee2e2; color:#b91c1c; font-size:0.7rem; padding:2px 6px; border-radius:4px; font-weight:bold; border:1px solid #fca5a5; margin-right:8px;">⚠️ بدون تحويلة</span>' : ''}
                      </div>
                     ${isRegisteredInMeeting ? '<span style="color:#0d9488; font-size:1.2rem;" title="تلقائي: تم تحويل المريض للجنة">🔘</span>' : ''}
                  </div>
@@ -1475,9 +1478,11 @@ Oncology Coordinator System`;
         }
 
         let noteIcon = b.specialistNoteUrl ? `<span title="عرض الملاحظة" onclick="event.stopPropagation(); UI.showImagePreview('${b.specialistNoteUrl}')" style="cursor:pointer; background:#dbeafe; color:#1e3a8a; padding:2px 4px; border-radius:4px; font-size:0.75rem; margin-top:4px; display:inline-block;">🖼️ مرفق</span>` : '';
+        
+        let isNoReferral = !b.referral || String(b.referral).trim().toUpperCase() === 'N';
 
         return `
-        <tr id="tr-${b.id}" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'SELECT' && event.target.tagName !== 'A' && event.target.tagName !== 'SPAN') UI.editPostClinicRow('${b.id}')" style="border-bottom:1px solid #f1f5f9; transition:background 0.2s; vertical-align:top; cursor:pointer;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+        <tr id="tr-${b.id}" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'SELECT' && event.target.tagName !== 'A' && event.target.tagName !== 'SPAN') UI.editPostClinicRow('${b.id}')" style="background:${isNoReferral ? '#fef2f2' : 'white'}; border-bottom:1px solid ${isNoReferral ? '#fecaca' : '#f1f5f9'}; transition:background 0.2s; vertical-align:top; cursor:pointer;" onmouseover="this.style.background='${isNoReferral ? '#fee2e2' : '#f8fafc'}'" onmouseout="this.style.background='${isNoReferral ? '#fef2f2' : 'white'}'">
             <td style="padding:12px 15px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="checkbox" class="pc-selection-checkbox" data-id="${b.id}" ${(UI.selectedPostClinicIds || []).includes(b.id) ? 'checked' : ''} onchange="UI.handlePCSelection('${b.id}', this.checked)" style="width:18px; height:18px; accent-color:#0d9488;">
@@ -1485,6 +1490,7 @@ Oncology Coordinator System`;
                         <div style="font-weight:900; color:#0f766e; background:transparent; border:none; width:180px; font-size:0.95rem; white-space:pre-wrap;">${b.patientName || ''}</div>
                         ${isRegisteredInMeeting ? '<div style="font-size:0.65rem; color:#0d9488; font-weight:bold; margin-top:2px;">✅ مسجل باللجنة</div>' : ''}
                         ${inFollowUp ? '<div style="font-size:0.65rem; color:#b45309; font-weight:bold; margin-top:2px;">⏳ قيد المتابعة</div>' : ''}
+                        ${isNoReferral ? '<div style="font-size:0.65rem; color:#b91c1c; font-weight:bold; margin-top:2px; display:inline-block; background:#fee2e2; padding:2px 6px; border-radius:4px; border:1px solid #fca5a5;">⚠️ بدون تحويلة</div>' : ''}
                     </div>
                 </div>
             </td>
@@ -1743,6 +1749,100 @@ Oncology Coordinator System`;
         
         if(tr) tr.style.opacity = '1';
         UI.showSaved();
+    },
+
+    getCreationDateFromId: function(id) {
+        if (!id) return new Date(0);
+        let numStr = String(id).replace(/[^0-9]/g, '');
+        if (numStr.length >= 13) return new Date(parseInt(numStr));
+        return new Date(0);
+    },
+
+    renderRecentlyAdded: async function() {
+        this.title.textContent = 'أُضيفت مؤخراً (اليوم)';
+        this.container.innerHTML = this.renderSkeleton(5);
+        
+        let allData = [];
+        if (this._masterRegistryCache) {
+            allData = this._masterRegistryCache;
+        } else if (this._pcCache) {
+            allData = this._pcCache;
+        } else {
+            allData = await API.getPostClinicBookings();
+            this._pcCache = allData;
+        }
+
+        // Filter data added today
+        let today = new Date();
+        today.setHours(0,0,0,0);
+        
+        let recentData = allData.filter(b => {
+            let d = this.getCreationDateFromId(b.id);
+            return d >= today;
+        });
+        
+        // Sort descending (newest first)
+        recentData.sort((a,b) => this.getCreationDateFromId(b.id) - this.getCreationDateFromId(a.id));
+
+        if(recentData.length === 0) {
+            this.container.innerHTML = `
+                <div style="text-align:center; padding:50px; color:var(--text-muted);">
+                    <div style="font-size:3rem; margin-bottom:20px;">🕒</div>
+                    <h2>لا يوجد مرضى تمت إضافتهم اليوم</h2>
+                    <p>قم باستيراد ملف Excel أو إضافة مريض جديد ليظهر هنا.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let newCasesMeetingCache = [];
+        try { newCasesMeetingCache = await API.getNewCasesMeeting(); } catch(e){}
+        let mrnSet = new Set();
+        newCasesMeetingCache.forEach(m => {
+            if(m.patientId) mrnSet.add(String(m.patientId).trim());
+        });
+
+        let viewMode = localStorage.getItem('pc-view-mode') || 'cards';
+        
+        let toggleHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; background:#fff; padding:12px 20px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div>
+                    <h3 style="margin:0; color:var(--primary); display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:1.5rem;">🕒</span> 
+                        المرضى المضافة اليوم 
+                        <span style="background:var(--secondary); color:white; padding:2px 10px; border-radius:20px; font-size:0.9rem;">${recentData.length} مريض</span>
+                    </h3>
+                    <p style="margin:4px 0 0; color:var(--text-muted); font-size:0.85rem;">هذه القائمة تعرض ما قمت باستيراده أو إضافته اليوم بغض النظر عن تاريخ الجلسة.</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button class="btn ${viewMode === 'cards' ? 'btn-primary' : ''}" onclick="localStorage.setItem('pc-view-mode', 'cards'); UI.renderRecentlyAdded();" style="border-radius:8px;">📇 بطاقات</button>
+                    <button class="btn ${viewMode === 'table' ? 'btn-primary' : ''}" onclick="localStorage.setItem('pc-view-mode', 'table'); UI.renderRecentlyAdded();" style="border-radius:8px;">📋 جدول</button>
+                </div>
+            </div>
+        `;
+
+        let contentHTML = '';
+        if (viewMode === 'table') {
+            let headers = `<th><input type="checkbox" disabled></th><th style="min-width:250px;">الاسم / الملف</th><th style="min-width:100px;">الرقم والعمر</th><th style="min-width:150px;">الطبيب والهاتف</th><th style="min-width:300px;">خطة العلاج</th><th style="min-width:150px;">المتابعة والتصاريح</th>`;
+            let rowsHTML = recentData.map(b => {
+                let isReg = b.patientCode && mrnSet.has(String(b.patientCode).trim());
+                return this.getPCBookingTableRowHTML(b, isReg);
+            }).join('');
+            contentHTML = `<div style="overflow-x:auto; background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05);"><table style="width:100%; border-collapse:collapse;"><thead><tr>${headers}</tr></thead><tbody>${rowsHTML}</tbody></table></div>`;
+        } else {
+            let cardsHTML = recentData.map(b => {
+                let isReg = b.patientCode && mrnSet.has(String(b.patientCode).trim());
+                return this.getPCBookingCardHTML(b, isReg);
+            }).join('');
+            contentHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:20px;">${cardsHTML}</div>`;
+        }
+
+        this.container.innerHTML = `
+            <div>
+                ${toggleHTML}
+                ${contentHTML}
+            </div>
+        `;
     },
 
     deletePCRow: function(id) {
@@ -2315,8 +2415,10 @@ Oncology Coordinator System`;
              let customData = {};
              if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
              let customTds = customCols.map(col => `<td>${customData[col] || ''}</td>`).join('');
+             let isNoReferral = !b.referral || String(b.referral).trim().toUpperCase() === 'N';
+             let rowStyle = isNoReferral ? 'background-color:#e2e8f0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;' : '';
              return `
-             <tr>
+             <tr style="${rowStyle}">
                  <td style="font-weight:bold;">${b.patientName || ''}</td>
                  <td style="font-family:monospace;">${b.patientCode || ''}</td>
                  <td style="text-align:center;">${b.patientAge || ''}</td>
@@ -2336,7 +2438,7 @@ Oncology Coordinator System`;
             + 'body{font-family:Tahoma,sans-serif;direction:rtl;padding:20px;}'
             + 'table{width:100%;border-collapse:collapse;font-size:13px;}'
             + 'th,td{border:1px solid #333;padding:8px;text-align:right;vertical-align:top;}'
-            + 'th{background:#eee;}'
+            + 'th{background:#eee; -webkit-print-color-adjust: exact; print-color-adjust: exact;}'
             + '@media print{@page{size:landscape;margin:8mm;}body{padding:0;}}'
             + '</style></head><body>'
             + pcPrintHeader

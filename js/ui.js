@@ -1754,7 +1754,7 @@ Oncology Coordinator System`;
     getCreationDateFromId: function(id) {
         if (!id) return new Date(0);
         let numStr = String(id).replace(/[^0-9]/g, '');
-        if (numStr.length >= 13) return new Date(parseInt(numStr));
+        if (numStr.length >= 13) return new Date(parseInt(numStr.substring(0, 13)));
         return new Date(0);
     },
 
@@ -1772,13 +1772,12 @@ Oncology Coordinator System`;
             this._pcCache = allData;
         }
 
-        // Filter data added today
-        let today = new Date();
-        today.setHours(0,0,0,0);
+        // Filter data added today strictly
+        let todayStr = new Date().toDateString();
         
         let recentData = allData.filter(b => {
             let d = this.getCreationDateFromId(b.id);
-            return d >= today;
+            return d.toDateString() === todayStr;
         });
         
         // Sort descending (newest first)
@@ -1815,6 +1814,9 @@ Oncology Coordinator System`;
                     <p style="margin:4px 0 0; color:var(--text-muted); font-size:0.85rem;">هذه القائمة تعرض ما قمت باستيراده أو إضافته اليوم بغض النظر عن تاريخ الجلسة.</p>
                 </div>
                 <div style="display:flex; align-items:center; gap:10px;">
+                    <button class="btn btn-primary" onclick="UI.printRecentlyAdded()" style="background:#0f766e; color:white; border:none; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:6px;">
+                        <span>🖨️</span> طباعة القائمة
+                    </button>
                     <button class="btn ${viewMode === 'cards' ? 'btn-primary' : ''}" onclick="localStorage.setItem('pc-view-mode', 'cards'); UI.renderRecentlyAdded();" style="border-radius:8px;">📇 بطاقات</button>
                     <button class="btn ${viewMode === 'table' ? 'btn-primary' : ''}" onclick="localStorage.setItem('pc-view-mode', 'table'); UI.renderRecentlyAdded();" style="border-radius:8px;">📋 جدول</button>
                 </div>
@@ -1843,6 +1845,82 @@ Oncology Coordinator System`;
                 ${contentHTML}
             </div>
         `;
+    },
+
+    printRecentlyAdded: async function() {
+        UI.showSaving(); // Show spinner
+        let allData = await API.getPostClinicBookings();
+        let todayStr = new Date().toDateString();
+        
+        let data = allData.filter(b => {
+            let d = this.getCreationDateFromId(b.id);
+            return d.toDateString() === todayStr;
+        });
+        
+        if(!data || data.length === 0) {
+            UI.showToast("لا يوجد بيانات تمت إضافتها اليوم للطباعة", "error");
+            return;
+        }
+
+        // Sort descending (newest first)
+        data.sort((a,b) => this.getCreationDateFromId(b.id) - this.getCreationDateFromId(a.id));
+
+        let customCols = [];
+        data.forEach(row => {
+            if(row.customData) {
+                try {
+                    let custom = JSON.parse(row.customData);
+                    Object.keys(custom).forEach(key => {
+                        if(!customCols.includes(key)) customCols.push(key);
+                    });
+                } catch(e) {}
+            }
+        });
+
+        let headers = `<th>Patient Name</th><th>Code</th><th>Age</th><th>Provider</th><th>Treatment Plan</th><th>OPC Appt</th><th>Phone</th><th>Notified</th><th>Permit</th><th>Referral</th>`;
+        customCols.forEach(col => headers += `<th>${col}</th>`);
+
+        let rowsHTML = data.map(b => {
+             let customData = {};
+             if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
+             let customTds = customCols.map(col => `<td>${customData[col] || ''}</td>`).join('');
+             let isNoReferral = !b.referral || String(b.referral).trim().toUpperCase() === 'N';
+             let rowStyle = isNoReferral ? 'background-color:#e2e8f0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;' : '';
+             return `
+             <tr style="${rowStyle}">
+                 <td style="font-weight:bold;">${b.patientName || ''}</td>
+                 <td style="font-family:monospace;">${b.patientCode || ''}</td>
+                 <td style="text-align:center;">${b.patientAge || ''}</td>
+                 <td>${b.providerName || ''}</td>
+                 <td style="max-width:350px; white-space:pre-wrap;">${(b.treatmentPlan || '').replace(/\\n/g, '<br>')}</td>
+                 <td style="white-space:nowrap;">${b.opcDate || ''}</td>
+                 <td style="direction:ltr;">${b.phoneNumber || ''}</td>
+                 <td style="text-align:center;">${b.notifiedPatient === 'Y' ? '✅' : ''}</td>
+                 <td style="text-align:center;">${b.permit || ''}</td>
+                 <td style="text-align:center;">${b.referral || ''}</td>
+                 ${customTds}
+             </tr>`;
+        }).join('');
+
+        let pcPrintHeader = UI.getPrintHeader();
+        let pcHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>طباعة المرضى المضافين اليوم</title><style>'
+            + 'body{font-family:Tahoma,sans-serif;direction:rtl;padding:20px;}'
+            + 'table{width:100%;border-collapse:collapse;font-size:13px;}'
+            + 'th,td{border:1px solid #333;padding:8px;text-align:right;vertical-align:top;}'
+            + 'th{background:#eee; -webkit-print-color-adjust: exact; print-color-adjust: exact;}'
+            + '@media print{@page{size:landscape;margin:8mm;}body{padding:0;}}'
+            + '</style></head><body>'
+            + '<h2 style="text-align:center; margin-bottom:20px;">قائمة المرضى المضافين اليوم بتاريخ: ' + new Date().toLocaleDateString('ar-EG') + '</h2>'
+            + pcPrintHeader
+            + '<table><thead><tr>' + headers + '</tr></thead><tbody>' + rowsHTML + '</tbody></table>'
+            + '<scr' + 'ipt>setTimeout(function(){window.print();window.close();},400);</scr' + 'ipt>'
+            + '</body></html>';
+
+        let printWindow = window.open('', '_blank');
+        UI.showSaved(); // Hide spinner
+        if (!printWindow) { UI.showToast('يرجى السماح بفتح النوافذ المنبثقة لعمل الطباعة', 'error'); return; }
+        printWindow.document.write(pcHTML);
+        printWindow.document.close();
     },
 
     deletePCRow: function(id) {

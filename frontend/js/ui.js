@@ -3680,8 +3680,9 @@ Oncology Coordinator System`;
                 followUps.push({
                     id: b.id, source: 'PC', patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientCode || '---', providerName: b.providerName || 'غير محدد',
-                    sessionDate: b.sessionDate || '---', 
+                    sessionDate: b.sessionDate || '---',
                     followUpNotes: b.followUpNotes || '',
+                    followUpType: b.followUpType || '',
                     treatmentPlan: b.treatmentPlan || ''
                 });
             } else if (b.notifiedPatient !== 'Y') {
@@ -3709,8 +3710,9 @@ Oncology Coordinator System`;
                 followUps.push({
                     id: b.id, source: 'NC', patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientId || '---', providerName: b.primaryPhysician || 'غير محدد',
-                    sessionDate: b.sessionDate || '---', 
+                    sessionDate: b.sessionDate || '---',
                     followUpNotes: cData.followUpNotes || '',
+                    followUpType: cData.followUpType || '',
                     treatmentPlan: b.treatmentPlan || ''
                 });
             }
@@ -3763,8 +3765,13 @@ Oncology Coordinator System`;
                 </div>`;
             }
 
+            let typeBadge = '';
+            if (b.followUpType) {
+                typeBadge = `<div style="display:inline-block; background:#92400e; color:white; padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold; margin-bottom:4px;">${UI.followUpTypeLabel(b.followUpType)}</div><br>`;
+            }
+
             if (hasFollowUpNotes || isSystemNote) {
-                noteContent = `<div style="font-weight:bold;">${b.followUpNotes}</div>` + showPlanBtn;
+                noteContent = typeBadge + `<div style="font-weight:bold;">${b.followUpNotes}</div>` + showPlanBtn;
             } else {
                 noteContent = b.treatmentPlan ? b.treatmentPlan : '';
             }
@@ -3934,28 +3941,53 @@ Oncology Coordinator System`;
         }
     },
 
+    // Shared list of follow-up types used by the "start follow-up" modal,
+    // the follow-up list badges, and the printed report.
+    FOLLOW_UP_TYPES: [
+        { value: 'REFERRAL', label: 'تحويل (Referral)' },
+        { value: 'PERMIT', label: 'تصريح (Permit)' },
+        { value: 'COMMUNICATE', label: 'التواصل مع المريض' },
+        { value: 'OTHER', label: 'أخرى (Other)' }
+    ],
+
+    followUpTypeLabel: function(value) {
+        const found = UI.FOLLOW_UP_TYPES.find(t => t.value === value);
+        return found ? found.label : '';
+    },
+
     startFollowUp: function(id, source = 'PC') {
+        const typeOptions = UI.FOLLOW_UP_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join('');
         UI.showModal(
             "🚶 طلب متابعة جديدة",
             `
             <div style="padding:10px 0;">
+                <label style="display:block; font-weight:bold; margin-bottom:10px; color:#92400e; font-size:1.1rem;">ما نوع مهمة المتابعة؟</label>
+                <select id="followup-type-input" class="pc-input" style="width:100%; margin-bottom:16px; background:#fffbeb; border:2px solid #fde68a; padding:12px; font-size:1rem;">
+                    <option value="" disabled selected>اختر نوع المتابعة...</option>
+                    ${typeOptions}
+                </select>
                 <label style="display:block; font-weight:bold; margin-bottom:10px; color:#92400e; font-size:1.1rem;">ما هي مهمة المتابعة المطلوبة لهذا المريض؟</label>
                 <textarea id="followup-notes-input" class="pc-input" style="width:100%; min-height:100px; resize:vertical; background:#fffbeb; border:2px solid #fde68a; padding:12px; font-size:1rem;" placeholder="مثال: حجز موعد أشعة، التأكد من فحص الدم..."></textarea>
             </div>
             `,
             () => {
+                const type = document.getElementById('followup-type-input').value;
                 const notes = document.getElementById('followup-notes-input').value.trim();
+                if (!type) {
+                    UI.showToast("يجب اختيار نوع المتابعة", "error");
+                    return;
+                }
                 if (!notes) {
                     UI.showToast("يجب إدخال مهمة المتابعة", "error");
                     return;
                 }
                 document.getElementById('app-modal').remove();
-                this._updateFollowUp(id, 'ACTIVE', notes, source);
+                this._updateFollowUp(id, 'ACTIVE', notes, source, type);
             }
         );
     },
 
-    _updateFollowUp: async function(id, status, notes, source = 'PC') {
+    _updateFollowUp: async function(id, status, notes, source = 'PC', type) {
         UI.showSaving();
         
         let isNC = source === 'NC';
@@ -3968,6 +4000,7 @@ Oncology Coordinator System`;
             let cData = this.parseNCCustomData(row.customData);
             cData.followUpStatus = status;
             if (notes !== undefined) cData.followUpNotes = notes;
+            if (type !== undefined) cData.followUpType = type;
             row.customData = JSON.stringify(cData);
         } else {
             let allData = API._cache?.postClinicBookings || [];
@@ -3975,6 +4008,7 @@ Oncology Coordinator System`;
             if(!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); UI.showSaved(); return; }
             row.followUpStatus = status;
             if (notes !== undefined) row.followUpNotes = notes;
+            if (type !== undefined) row.followUpType = type;
         }
 
         // Invalidate derived caches
@@ -4043,6 +4077,7 @@ Oncology Coordinator System`;
                     let cData = this.parseNCCustomData(row.customData);
                     cData.followUpStatus = 'FINISHED';
                     cData.followUpNotes = null;
+                    cData.followUpType = null;
                     cData.notifiedPatient = 'Y';
                     row.customData = JSON.stringify(cData);
                     rowToSave = row;
@@ -4053,6 +4088,7 @@ Oncology Coordinator System`;
                     row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
                     row.followUpStatus = 'FINISHED';
                     row.followUpNotes = null;
+                    row.followUpType = null;
                     row.notifiedPatient = 'Y';
                     rowToSave = row;
                 }
@@ -4205,6 +4241,7 @@ Oncology Coordinator System`;
                     providerName: b.providerName || 'غير محدد',
                     sessionDate: b.sessionDate || '---',
                     followUpNotes: b.followUpNotes || 'لا توجد ملاحظات',
+                    followUpType: b.followUpType || '',
                     treatmentPlan: b.treatmentPlan || '',
                     phoneNumber: b.phoneNumber || '',
                     isUnnotified: false, isAwaitingAppt: false
@@ -4248,6 +4285,7 @@ Oncology Coordinator System`;
                     providerName: b.primaryPhysician || 'غير محدد',
                     sessionDate: b.sessionDate || '---',
                     followUpNotes: cData.followUpNotes || 'لا توجد ملاحظات',
+                    followUpType: cData.followUpType || '',
                     treatmentPlan: b.treatmentPlan || '',
                     phoneNumber: b.phoneNumber || '',
                     isUnnotified: false, isAwaitingAppt: false
@@ -4301,6 +4339,7 @@ Oncology Coordinator System`;
                 <td>د. ${b.providerName || ''}</td>
                 <td class="col-plan">${(b.treatmentPlan || '').replace(/<[^>]*>?/gm, '')}</td>
                 <td class="col-task">${printTask}</td>
+                <td style="text-align:center; font-size:11px;">${b.followUpType ? UI.followUpTypeLabel(b.followUpType) : ''}</td>
                 <td style="text-align:center;">${b.phoneNumber || ''}</td>
             </tr>
             `;
@@ -4323,7 +4362,8 @@ Oncology Coordinator System`;
                 th:nth-child(4) { width: 120px; }
                 .col-plan { width: ${settings.planWidth}; font-size: 0.95em; line-height: 1.4; }
                 .col-task { background: #fff7ed; font-weight: bold; color: #92400e; }
-                th:nth-child(7) { width: 110px; }
+                th:nth-child(7) { width: 100px; }
+                th:nth-child(8) { width: 110px; }
 
                 @media print { 
                     @page { size: ${settings.orientation}; margin: 8mm; } 
@@ -4343,6 +4383,7 @@ Oncology Coordinator System`;
                             <th>الطبيب المعالج</th>
                             <th>خطة العلاج (Treatment Plan)</th>
                             <th>مهمة المتابعة المطلوبة</th>
+                            <th>نوع المتابعة</th>
                             <th>رقم الهاتف</th>
                         </tr>
                     </thead>

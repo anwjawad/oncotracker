@@ -1343,11 +1343,13 @@ Oncology Coordinator System`;
     // ============================================
     pcCustomColumns: [],
     followUpSearchQuery: '',
+    followUpTypeFilter: 'ALL',
     postClinicSearchQuery: '',
 
     getPCBookingCardHTML: function(b, isRegisteredInMeeting) {
         const isFollowUpPage = document.querySelector('.nav-links li.active')?.getAttribute('data-route') === 'follow-up';
-        const inFollowUp = b.followUpStatus === 'ACTIVE';
+        const activeFollowUps = UI.getActiveFollowUps(b, false);
+        const inFollowUp = activeFollowUps.length > 0;
 
         let customData = {};
         if(b.customData) try { customData = JSON.parse(b.customData); } catch(e){}
@@ -1376,7 +1378,7 @@ Oncology Coordinator System`;
              <!-- Badge: Follow-up -->
              ${inFollowUp ? `
              <div style="position:absolute; top:10px; right:10px; background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:20px; font-size:0.75rem; font-weight:900; display:flex; align-items:center; gap:4px; border:1px solid #fde68a; z-index:2;">
-                ⏳ قيد المتابعة
+                ⏳ قيد المتابعة (${activeFollowUps.length})
              </div>
              ` : ''}
 
@@ -1396,10 +1398,9 @@ Oncology Coordinator System`;
                  <div style="min-height:45px; font-size:1.15rem; font-weight:800; color:#0f766e; background:#f0fdfa; border:2px solid #0d9488; padding:8px; border-radius:6px; white-space:pre-wrap;">${b.patientName || ''}</div>
              </div>
 
-             ${inFollowUp && b.followUpNotes ? `
+             ${inFollowUp ? `
              <div style="background:#fffbeb; padding:10px; border-radius:8px; border-right:4px solid #f59e0b; font-size:0.9rem; color:#92400e;">
-                <strong>📌 ملاحظة المتابعة:</strong><br>
-                ${b.followUpNotes}
+                ${activeFollowUps.map(e => `<div style="margin-bottom:6px;">${e.type ? `<span style="display:inline-block; background:#92400e; color:white; padding:1px 6px; border-radius:10px; font-size:0.7rem; font-weight:bold; margin-left:6px;">${UI.followUpTypeLabel(e.type)}</span>` : '📌 '}${e.notes || ''}</div>`).join('')}
              </div>
              ` : ''}
 
@@ -1449,13 +1450,12 @@ Oncology Coordinator System`;
                  </div>
                  ${dynamicFields}
                  
-                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; border-top:1px solid #f1f5f9; padding-top:12px;">
-                     ${!inFollowUp ? `
-                         <button class="btn" onclick="event.stopPropagation(); UI.startFollowUp('${b.id}', 'PC')" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;">🚶 متابعة</button>
-                     ` : `
-                         <button class="btn" onclick="event.stopPropagation(); UI.finishFollowUp('${b.id}')" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;">✅ انتهاء المهمة</button>
-                     `}
-                     <button class="btn" onclick="event.stopPropagation(); UI.deletePCRow('${b.id}')" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.9rem;">🗑️ حذف الملف</button>
+                 <div style="display:grid; grid-template-columns: ${inFollowUp ? '1fr 1fr 1fr' : '1fr 1fr'}; gap:8px; margin-top:12px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                     <button class="btn" onclick="event.stopPropagation(); UI.startFollowUp('${b.id}', 'PC')" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.85rem;">🚶 متابعة جديدة</button>
+                     ${inFollowUp ? `
+                         <button class="btn" onclick="event.stopPropagation(); UI.finishFollowUp('${b.id}', 'PC')" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.85rem;">✅ انتهاء مهمة</button>
+                     ` : ''}
+                     <button class="btn" onclick="event.stopPropagation(); UI.deletePCRow('${b.id}')" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; font-weight:bold; border-radius:8px; cursor:pointer; padding:10px; font-size:0.85rem;">🗑️ حذف الملف</button>
                  </div>
              </div>
          </div>
@@ -1463,7 +1463,8 @@ Oncology Coordinator System`;
     },
 
     getPCBookingTableRowHTML: function(b, isRegisteredInMeeting) {
-        const inFollowUp = b.followUpStatus === 'ACTIVE';
+        const activeFollowUpsRow = UI.getActiveFollowUps(b, false);
+        const inFollowUp = activeFollowUpsRow.length > 0;
         
         // Handle custom columns
         let dynamicFields = '';
@@ -1489,7 +1490,7 @@ Oncology Coordinator System`;
                     <div>
                         <div style="font-weight:900; color:#0f766e; background:transparent; border:none; width:180px; font-size:0.95rem; white-space:pre-wrap;">${b.patientName || ''}</div>
                         ${isRegisteredInMeeting ? '<div style="font-size:0.65rem; color:#0d9488; font-weight:bold; margin-top:2px;">✅ مسجل باللجنة</div>' : ''}
-                        ${inFollowUp ? '<div style="font-size:0.65rem; color:#b45309; font-weight:bold; margin-top:2px;">⏳ قيد المتابعة</div>' : ''}
+                        ${inFollowUp ? `<div style="font-size:0.65rem; color:#b45309; font-weight:bold; margin-top:2px;">⏳ قيد المتابعة (${activeFollowUpsRow.length})</div>` : ''}
                         ${isNoReferral ? '<div style="font-size:0.65rem; color:#b91c1c; font-weight:bold; margin-top:2px; display:inline-block; background:#fee2e2; padding:2px 6px; border-radius:4px; border:1px solid #fca5a5;">⚠️ بدون تحويلة</div>' : ''}
                     </div>
                 </div>
@@ -1526,11 +1527,10 @@ Oncology Coordinator System`;
             ${dynamicFields}
             <td style="padding:12px 15px;">
                 <div style="display:flex; flex-direction:column; gap:6px; justify-content:center;">
-                     ${!inFollowUp ? `
-                        <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
-                    ` : `
-                        <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.finishFollowUp('${b.id}')">✅ انتهاء</button>
-                    `}
+                    <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.startFollowUp('${b.id}', 'PC')">🚶 متابعة</button>
+                    ${inFollowUp ? `
+                        <button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.finishFollowUp('${b.id}', 'PC')">✅ إنهاء</button>
+                    ` : ''}
                     <button class="btn" style="background:#fee2e2; color:#ef4444; border:1px solid #fecaca; padding:6px 10px; font-size:0.85rem; border-radius:6px; font-weight:bold;" onclick="event.stopPropagation(); UI.deletePCRow('${b.id}')">🗑️ حذف</button>
                 </div>
             </td>
@@ -2216,6 +2216,8 @@ Oncology Coordinator System`;
                 customData: JSON.stringify(updatedCustomData),
                 followUpStatus: b.followUpStatus,
                 followUpNotes: b.followUpNotes,
+                followUpType: b.followUpType,
+                followUpsData: b.followUpsData,
                 specialistNoteUrl: currentNoteUrl
             };
 
@@ -2534,7 +2536,8 @@ Oncology Coordinator System`;
     
     getNCBookingCardHTML: function(b) {
         let isArchived = b.customData && b.customData.includes('"isArchived":"Y"');
-        let isFollowUpActive = b.customData && b.customData.includes('"followUpStatus":"ACTIVE"');
+        let activeFollowUpsNC = UI.getActiveFollowUps(b, true);
+        let isFollowUpActive = activeFollowUpsNC.length > 0;
         let isAutoTransferred = String(b.id).startsWith('NC_AUTO_');
         
         return `
@@ -2569,9 +2572,9 @@ Oncology Coordinator System`;
 
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:12px; margin-top:4px;">
                 <div style="display:flex; gap:16px; align-items:center;">
-                    ${isFollowUpActive ? 
-                        `<button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 12px; border-radius:20px; font-weight:bold;" onclick="UI.finishFollowUp('${b.id}', 'NC')">✅ إنهاء المتابعة</button>` :
-                        `<button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 12px; border-radius:20px; font-weight:bold;" onclick="UI.startFollowUp('${b.id}', 'NC')">🚶 طلب متابعة</button>`
+                    <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:6px 12px; border-radius:20px; font-weight:bold;" onclick="UI.startFollowUp('${b.id}', 'NC')">🚶 طلب متابعة</button>
+                    ${isFollowUpActive ?
+                        `<button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:6px 12px; border-radius:20px; font-weight:bold;" onclick="UI.finishFollowUp('${b.id}', 'NC')">✅ إنهاء المتابعة (${activeFollowUpsNC.length})</button>` : ''
                     }
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                         <input type="checkbox" ${b.customData && b.customData.includes('"notifiedPatient":"Y"') ? 'checked' : ''} onchange="UI.updateNCCustomData('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')" style="transform:scale(1.2);">
@@ -2594,8 +2597,10 @@ Oncology Coordinator System`;
                     </div>
                 </div>
                 <div style="margin-top:12px;">
-                    <label style="font-size:0.8rem; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">📌 ملاحظات المتابعة</label>
-                    <textarea class="pc-input" onchange="UI.updateNCCustomData('${b.id}', 'followUpNotes', this.value)" style="width:100%; min-height:60px; background:#fefce8; border:1px solid #fde047;">${UI.parseNCCustomData(b.customData).followUpNotes || ''}</textarea>
+                    <label style="font-size:0.8rem; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">📌 مهام المتابعة الحالية</label>
+                    <div style="width:100%; min-height:40px; background:#fefce8; border:1px solid #fde047; border-radius:6px; padding:8px; font-size:0.85rem;">
+                        ${activeFollowUpsNC.length > 0 ? activeFollowUpsNC.map(e => `<div style="margin-bottom:6px;">${e.type ? `<span style="display:inline-block; background:#92400e; color:white; padding:1px 6px; border-radius:10px; font-size:0.7rem; font-weight:bold; margin-left:6px;">${UI.followUpTypeLabel(e.type)}</span>` : ''}${e.notes || ''}</div>`).join('') : '<span style="color:#94a3b8;">لا توجد مهام متابعة نشطة حالياً.</span>'}
+                    </div>
                 </div>
             </div>
         </div>
@@ -2603,7 +2608,8 @@ Oncology Coordinator System`;
     },
 
     getNCBookingTableRowHTML: function(b, index) {
-        let isFollowUpActive = b.customData && b.customData.includes('"followUpStatus":"ACTIVE"');
+        let activeFollowUpsNCRow = UI.getActiveFollowUps(b, true);
+        let isFollowUpActive = activeFollowUpsNCRow.length > 0;
         let isAutoTransferred = String(b.id).startsWith('NC_AUTO_');
         
         return `
@@ -2637,9 +2643,9 @@ Oncology Coordinator System`;
             </td>
             <td style="padding:12px 15px;">
                 <div style="display:flex; flex-direction:column; gap:6px; align-items:center;">
-                    ${isFollowUpActive ? 
-                        `<button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:4px 8px; font-size:0.75rem; border-radius:6px; font-weight:bold; width:100%;" onclick="UI.finishFollowUp('${b.id}', 'NC')">✅ إنهاء</button>` :
-                        `<button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:4px 8px; font-size:0.75rem; border-radius:6px; font-weight:bold; width:100%;" onclick="UI.startFollowUp('${b.id}', 'NC')">🚶 متابعة</button>`
+                    <button class="btn" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; padding:4px 8px; font-size:0.75rem; border-radius:6px; font-weight:bold; width:100%;" onclick="UI.startFollowUp('${b.id}', 'NC')">🚶 متابعة</button>
+                    ${isFollowUpActive ?
+                        `<button class="btn" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; padding:4px 8px; font-size:0.75rem; border-radius:6px; font-weight:bold; width:100%;" onclick="UI.finishFollowUp('${b.id}', 'NC')">✅ إنهاء</button>` : ''
                     }
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; margin-top:2px;">
                         <input type="checkbox" ${b.customData && b.customData.includes('"notifiedPatient":"Y"') ? 'checked' : ''} onchange="UI.updateNCCustomData('${b.id}', 'notifiedPatient', this.checked ? 'Y' : 'N')">
@@ -3752,16 +3758,19 @@ Oncology Coordinator System`;
         let followUps = [];
         let unnotified = [];
         let awaitingAppt = [];
-        
+
         pcData.forEach(b => {
-            if(b.followUpStatus === 'ACTIVE') {
-                followUps.push({
-                    id: b.id, source: 'PC', patientName: b.patientName || 'بدون اسم',
-                    patientCode: b.patientCode || '---', providerName: b.providerName || 'غير محدد',
-                    sessionDate: b.sessionDate || '---',
-                    followUpNotes: b.followUpNotes || '',
-                    followUpType: b.followUpType || '',
-                    treatmentPlan: b.treatmentPlan || ''
+            let activeEntries = this.getActiveFollowUps(b, false);
+            if (activeEntries.length > 0) {
+                activeEntries.forEach(entry => {
+                    followUps.push({
+                        id: b.id, followUpId: entry.id, source: 'PC', patientName: b.patientName || 'بدون اسم',
+                        patientCode: b.patientCode || '---', providerName: b.providerName || 'غير محدد',
+                        sessionDate: b.sessionDate || '---',
+                        followUpNotes: entry.notes || '',
+                        followUpType: entry.type || '',
+                        treatmentPlan: b.treatmentPlan || ''
+                    });
                 });
             } else if (b.notifiedPatient !== 'Y') {
                 if (b.opcDate && b.opcDate.trim() !== '') {
@@ -3783,18 +3792,25 @@ Oncology Coordinator System`;
         });
 
         ncData.forEach(b => {
-            let cData = this.parseNCCustomData(b.customData);
-            if(cData.followUpStatus === 'ACTIVE') {
+            this.getActiveFollowUps(b, true).forEach(entry => {
                 followUps.push({
-                    id: b.id, source: 'NC', patientName: b.patientName || 'بدون اسم',
+                    id: b.id, followUpId: entry.id, source: 'NC', patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientId || '---', providerName: b.primaryPhysician || 'غير محدد',
                     sessionDate: b.sessionDate || '---',
-                    followUpNotes: cData.followUpNotes || '',
-                    followUpType: cData.followUpType || '',
+                    followUpNotes: entry.notes || '',
+                    followUpType: entry.type || '',
                     treatmentPlan: b.treatmentPlan || ''
                 });
-            }
+            });
         });
+
+        // Type-filter tab counts, computed from the full active list before filtering.
+        let typeFilter = this.followUpTypeFilter || 'ALL';
+        let typeCounts = { ALL: followUps.length };
+        UI.FOLLOW_UP_TYPES.forEach(t => { typeCounts[t.value] = followUps.filter(f => f.followUpType === t.value).length; });
+        if (typeFilter !== 'ALL') {
+            followUps = followUps.filter(f => f.followUpType === typeFilter);
+        }
 
         followUps.sort((a,b) => new Date(a.sessionDate || 0) - new Date(b.sessionDate || 0));
         unnotified.sort((a,b) => new Date(a.sessionDate || 0) - new Date(b.sessionDate || 0));
@@ -3870,7 +3886,7 @@ Oncology Coordinator System`;
                 <td style="padding:15px; border-bottom:1px solid #f1f5f9; text-align:left;">
                     <div style="display:flex; gap:8px; justify-content:flex-end;">
                         <button class="btn btn-primary" style="padding:6px 12px; font-size:0.85rem; background:#0f766e;" onclick="UI.openDossierModal('${b.id}')">👁️ عرض بالملف</button>
-                        <button class="btn" style="padding:6px 12px; font-size:0.85rem; background:#f0fdf4; color:#15803d; border:1px solid #86efac;" onclick="UI.finishFollowUp('${b.id}', '${b.source}')">✅ إنهاء</button>
+                        <button class="btn" style="padding:6px 12px; font-size:0.85rem; background:#f0fdf4; color:#15803d; border:1px solid #86efac;" onclick="UI.finishFollowUp('${b.id}', '${b.source}', '${b.followUpId || ''}')">✅ إنهاء</button>
                     </div>
                 </td>
             </tr>
@@ -3899,6 +3915,13 @@ Oncology Coordinator System`;
                                 style="width:100%; padding:12px 45px 12px 15px; border-radius:12px; border:2px solid #fdba74; outline:none; font-weight:700;">
                         <span style="position:absolute; right:15px; top:50%; transform:translateY(-50%); font-size:1.2rem; opacity:0.6;">🔍</span>
                     </div>
+                </div>
+
+                <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap; padding:15px 25px; background:#fff; border-bottom:1px solid #f1f5f9;">
+                    <button onclick="UI.followUpTypeFilter='ALL'; UI.renderFollowUpView();" style="padding:8px 16px; border-radius:20px; border:2px solid ${typeFilter==='ALL' ? '#92400e' : '#e2e8f0'}; background:${typeFilter==='ALL' ? '#92400e' : '#fff'}; color:${typeFilter==='ALL' ? '#fff' : '#475569'}; font-weight:bold; cursor:pointer; font-size:0.85rem;">الكل (${typeCounts.ALL})</button>
+                    ${UI.FOLLOW_UP_TYPES.map(t => `
+                        <button onclick="UI.followUpTypeFilter='${t.value}'; UI.renderFollowUpView();" style="padding:8px 16px; border-radius:20px; border:2px solid ${typeFilter===t.value ? '#92400e' : '#e2e8f0'}; background:${typeFilter===t.value ? '#92400e' : '#fff'}; color:${typeFilter===t.value ? '#fff' : '#475569'}; font-weight:bold; cursor:pointer; font-size:0.85rem;">${t.label} (${typeCounts[t.value]})</button>
+                    `).join('')}
                 </div>
 
                 ${unnotified.length > 0 ? `
@@ -4033,6 +4056,67 @@ Oncology Coordinator System`;
         return found ? found.label : '';
     },
 
+    // ============================================
+    //   FOLLOW-UP ENTRIES DATA MODEL (multiple follow-ups per patient)
+    // ============================================
+    // Each patient can have several follow-up tasks open at once (e.g. a
+    // referral AND a permit). Entries are stored as a JSON array:
+    //   { id, type, notes, status: 'ACTIVE'|'FINISHED', createdAt, finishedNote, finishedAt }
+    // - PC bookings: array lives in the `followUpsData` column (JSON string).
+    // - NC meetings: array lives at customData.followUpsData.
+    // The legacy single-follow-up fields (followUpStatus/followUpNotes/
+    // followUpType) are migrated automatically on first read, and kept in
+    // sync on every save (mirroring the most recent active entry) so any
+    // older code path that still reads them keeps working.
+    _genFollowUpId: function() {
+        return 'fu_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    },
+
+    getFollowUpEntries: function(row, isNC) {
+        let container = isNC ? this.parseNCCustomData(row.customData) : row;
+        let raw = container.followUpsData;
+        let entries = [];
+        if (raw) {
+            try { entries = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { entries = []; }
+        }
+        if (!Array.isArray(entries)) entries = [];
+        if (entries.length === 0 && container.followUpStatus === 'ACTIVE') {
+            // Migrate the legacy single follow-up into the new array format.
+            entries = [{
+                id: this._genFollowUpId(),
+                type: container.followUpType || '',
+                notes: container.followUpNotes || '',
+                status: 'ACTIVE',
+                createdAt: new Date().toISOString(),
+                finishedNote: null,
+                finishedAt: null
+            }];
+        }
+        return entries;
+    },
+
+    getActiveFollowUps: function(row, isNC) {
+        return this.getFollowUpEntries(row, isNC).filter(e => e.status === 'ACTIVE');
+    },
+
+    saveFollowUpEntries: function(row, isNC, entries) {
+        const activeOnes = entries.filter(e => e.status === 'ACTIVE');
+        const latestActive = activeOnes[activeOnes.length - 1];
+        if (isNC) {
+            let cData = this.parseNCCustomData(row.customData);
+            cData.followUpsData = entries;
+            cData.followUpStatus = activeOnes.length > 0 ? 'ACTIVE' : 'FINISHED';
+            cData.followUpNotes = latestActive ? latestActive.notes : null;
+            cData.followUpType = latestActive ? latestActive.type : null;
+            row.customData = JSON.stringify(cData);
+        } else {
+            row.followUpsData = JSON.stringify(entries);
+            row.followUpStatus = activeOnes.length > 0 ? 'ACTIVE' : 'FINISHED';
+            row.followUpNotes = latestActive ? latestActive.notes : null;
+            row.followUpType = latestActive ? latestActive.type : null;
+        }
+    },
+
     startFollowUp: function(id, source = 'PC') {
         const typeOptions = UI.FOLLOW_UP_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join('');
         UI.showModal(
@@ -4060,34 +4144,35 @@ Oncology Coordinator System`;
                     return;
                 }
                 document.getElementById('app-modal').remove();
-                this._updateFollowUp(id, 'ACTIVE', notes, source, type);
+                this.addFollowUpEntry(id, source, type, notes);
             }
         );
     },
 
-    _updateFollowUp: async function(id, status, notes, source = 'PC', type) {
+    // Adds a new follow-up entry for a patient WITHOUT touching any existing
+    // ones, so a patient can have several open follow-ups at once (e.g. a
+    // referral and a permit in parallel).
+    addFollowUpEntry: async function(id, source, type, notes) {
         UI.showSaving();
-        
+
         let isNC = source === 'NC';
+        let row = isNC
+            ? (API._cache?.newCasesMeeting || []).find(r => String(r.id).trim() === String(id).trim())
+            : (API._cache?.postClinicBookings || []).find(r => String(r.id).trim() === String(id).trim());
+        if (!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); UI.showSaved(); return; }
 
         // ---- OPTIMISTIC UPDATE: mutate cache immediately for instant UI ----
-        if (isNC) {
-            let allDataNC = API._cache?.newCasesMeeting || [];
-            let row = allDataNC.find(r => String(r.id).trim() === String(id).trim());
-            if(!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); UI.showSaved(); return; }
-            let cData = this.parseNCCustomData(row.customData);
-            cData.followUpStatus = status;
-            if (notes !== undefined) cData.followUpNotes = notes;
-            if (type !== undefined) cData.followUpType = type;
-            row.customData = JSON.stringify(cData);
-        } else {
-            let allData = API._cache?.postClinicBookings || [];
-            let row = allData.find(r => String(r.id).trim() === String(id).trim());
-            if(!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); UI.showSaved(); return; }
-            row.followUpStatus = status;
-            if (notes !== undefined) row.followUpNotes = notes;
-            if (type !== undefined) row.followUpType = type;
-        }
+        let entries = this.getFollowUpEntries(row, isNC);
+        entries.push({
+            id: this._genFollowUpId(),
+            type: type,
+            notes: notes,
+            status: 'ACTIVE',
+            createdAt: new Date().toISOString(),
+            finishedNote: null,
+            finishedAt: null
+        });
+        this.saveFollowUpEntries(row, isNC, entries);
 
         // Invalidate derived caches
         this._pcCache = null;
@@ -4102,29 +4187,56 @@ Oncology Coordinator System`;
         else if (currentRoute === 'post-clinic') this.renderPostClinicBookings();
         else if (currentRoute === 'new-cases') this.renderNewCasesMeeting();
 
-        UI.showToast(status === 'ACTIVE' ? "تم النقل لقسم المتابعة 🚶" : "تم إنهاء المهمة بنجاح ✅");
+        UI.showToast("تم إضافة مهمة متابعة جديدة 🚶");
 
         // ---- BACKGROUND SYNC: confirm with server ----
         try {
-            if (isNC) {
-                let allDataNC = API._cache?.newCasesMeeting || [];
-                let row = allDataNC.find(r => String(r.id).trim() === String(id).trim());
-                if(row) await API.updateNewCaseMeeting(row);
-            } else {
-                let allData = API._cache?.postClinicBookings || [];
-                let row = allData.find(r => String(r.id).trim() === String(id).trim());
-                if(row) await API.updatePostClinicBooking(row);
-            }
+            if (isNC) await API.updateNewCaseMeeting(row);
+            else await API.updatePostClinicBooking(row);
         } catch(err) {
-            console.warn('Background sync failed for follow-up update:', err);
+            console.warn('Background sync failed for follow-up add:', err);
         }
     },
 
-    finishFollowUp: function(id, source = 'PC') {
+    // Finishes a follow-up task for a patient.
+    // - followUpId given (dedicated Follow-Up page): closes exactly that entry.
+    // - Not given, exactly one active entry: closes it directly (old single-follow-up UX, unchanged).
+    // - Not given, several active entries: asks which one to close first.
+    // - No active entries at all (e.g. "awaiting notification" rows that never
+    //   had a real follow-up task): falls back to the original behavior of
+    //   just logging the note and marking the patient as notified.
+    finishFollowUp: function(id, source = 'PC', followUpId) {
+        let isNC = source === 'NC';
+        let row = isNC
+            ? (API._cache?.newCasesMeeting || []).find(r => String(r.id).trim() === String(id).trim())
+            : (API._cache?.postClinicBookings || []).find(r => String(r.id).trim() === String(id).trim());
+        if (!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); return; }
+
+        let activeEntries = this.getActiveFollowUps(row, isNC);
+        let target = followUpId ? activeEntries.find(e => e.id === followUpId) : null;
+
+        if (!target && !followUpId && activeEntries.length === 1) {
+            target = activeEntries[0];
+        }
+
+        if (!target && !followUpId && activeEntries.length > 1) {
+            // Several open follow-ups: let the user pick which one to close.
+            const optionsHTML = activeEntries.map(e => `
+                <button onclick="document.getElementById('app-modal').remove(); UI.finishFollowUp('${id}', '${source}', '${e.id}')" style="display:block; width:100%; text-align:right; background:#fff7ed; color:#78350f; border:1px solid #fdba74; border-radius:8px; padding:12px; margin-bottom:8px; font-weight:bold; cursor:pointer;">
+                    ${e.type ? `<div style="display:inline-block; background:#92400e; color:white; padding:2px 8px; border-radius:12px; font-size:0.7rem; margin-bottom:6px;">${UI.followUpTypeLabel(e.type)}</div><br>` : ''}
+                    ${e.notes || ''}
+                </button>
+            `).join('');
+            UI.showModal("اختر مهمة المتابعة المراد إنهاؤها", `<div>${optionsHTML}</div>`, null, true);
+            return;
+        }
+
         UI.showModal(
             "✅ إنهاء مهمة المتابعة",
             `
             <div style="padding:10px 0;">
+                ${target && target.type ? `<div style="display:inline-block; background:#92400e; color:white; padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; margin-bottom:12px;">${UI.followUpTypeLabel(target.type)}</div>` : ''}
+                ${target ? `<div style="background:#fffbeb; padding:10px; border-radius:8px; margin-bottom:16px; font-size:0.9rem; color:#92400e;"><strong>المهمة:</strong> ${target.notes || ''}</div>` : ''}
                 <label style="display:block; font-weight:bold; margin-bottom:10px; color:#15803d; font-size:1.1rem;">ماذا فعلت مع المريض لإغلاق هذه المهمة؟</label>
                 <div style="font-size:0.85rem; color:#64748b; margin-bottom:12px;">(سيتم تسجيل هذا النص في خطة العلاج بلون مختلف)</div>
                 <textarea id="followup-finish-input" class="pc-input" style="width:100%; min-height:100px; resize:vertical; background:#f0fdf4; border:2px solid #86efac; padding:12px; font-size:1rem;" placeholder="مثال: تم التحدث مع المريض وتحديد موعد..."></textarea>
@@ -4138,64 +4250,64 @@ Oncology Coordinator System`;
                 }
                 document.getElementById('app-modal').remove();
                 UI.showSaving();
-                
+
                 const now = new Date();
                 const dateStr = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
-                const followUpEntry = `\n<div style="color:#0369a1; font-weight:bold; margin-top:12px; border-top:1px dashed #bae6fd; padding-top:12px; font-size:0.95rem;">✅ تم إنهاء المهمة (${dateStr}):<br>${note}</div>`;
+                const typeLabel = target && target.type ? `[${UI.followUpTypeLabel(target.type)}] ` : '';
+                const followUpEntry = `\n<div style="color:#0369a1; font-weight:bold; margin-top:12px; border-top:1px dashed #bae6fd; padding-top:12px; font-size:0.95rem;">✅ تم إنهاء المهمة ${typeLabel}(${dateStr}):<br>${note}</div>`;
 
                 // ---- OPTIMISTIC UPDATE: mutate cache immediately ----
-                let rowToSave = null;
-                let isNC = source === 'NC';
+                let freshRow = isNC
+                    ? (API._cache?.newCasesMeeting || []).find(r => String(r.id).trim() === String(id).trim())
+                    : (API._cache?.postClinicBookings || []).find(r => String(r.id).trim() === String(id).trim());
+                if (!freshRow) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); return; }
+
+                freshRow.treatmentPlan = (freshRow.treatmentPlan || "") + followUpEntry;
+
+                if (target) {
+                    let entries = UI.getFollowUpEntries(freshRow, isNC);
+                    let entry = entries.find(e => e.id === target.id);
+                    if (entry) {
+                        entry.status = 'FINISHED';
+                        entry.finishedNote = note;
+                        entry.finishedAt = now.toISOString();
+                    }
+                    UI.saveFollowUpEntries(freshRow, isNC, entries);
+                }
 
                 if (isNC) {
-                    let allDataNC = API._cache?.newCasesMeeting || [];
-                    let row = allDataNC.find(r => r.id === id);
-                    if(!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); return; }
-                    row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
-                    let cData = this.parseNCCustomData(row.customData);
-                    cData.followUpStatus = 'FINISHED';
-                    cData.followUpNotes = null;
-                    cData.followUpType = null;
+                    let cData = UI.parseNCCustomData(freshRow.customData);
                     cData.notifiedPatient = 'Y';
-                    row.customData = JSON.stringify(cData);
-                    rowToSave = row;
+                    freshRow.customData = JSON.stringify(cData);
                 } else {
-                    let allData = API._cache?.postClinicBookings || [];
-                    let row = allData.find(r => r.id === id);
-                    if(!row) { UI.showToast("خطأ: لم يتم العثور على المريض", "error"); return; }
-                    row.treatmentPlan = (row.treatmentPlan || "") + followUpEntry;
-                    row.followUpStatus = 'FINISHED';
-                    row.followUpNotes = null;
-                    row.followUpType = null;
-                    row.notifiedPatient = 'Y';
-                    rowToSave = row;
+                    freshRow.notifiedPatient = 'Y';
                 }
 
                 // Invalidate caches
-                this._masterRegistryCache = null;
-                this._followUpCache = null;
-                this._pcCache = null;
-                this._ncCache = null;
+                UI._masterRegistryCache = null;
+                UI._followUpCache = null;
+                UI._pcCache = null;
+                UI._ncCache = null;
                 API.persistCache();
 
                 // ---- INSTANT UI REFRESH ----
                 const currentRoute = document.querySelector('.nav-links li.active')?.getAttribute('data-route');
-                if (currentRoute === 'follow-up') this.renderFollowUpView();
-                else if (currentRoute === 'post-clinic') this.renderPostClinicBookings();
-                else if (currentRoute === 'new-cases') this.renderNewCasesMeeting();
+                if (currentRoute === 'follow-up') UI.renderFollowUpView();
+                else if (currentRoute === 'post-clinic') UI.renderPostClinicBookings();
+                else if (currentRoute === 'new-cases') UI.renderNewCasesMeeting();
 
                 UI.showToast("تم توثيق الإجراء وإغلاق المهمة بنجاح ✅");
 
                 // ---- BACKGROUND SYNC ----
                 try {
-                    if (isNC) await API.updateNewCaseMeeting(rowToSave);
-                    else await API.updatePostClinicBooking(rowToSave);
+                    if (isNC) await API.updateNewCaseMeeting(freshRow);
+                    else await API.updatePostClinicBooking(freshRow);
                 } catch(err) {
                     console.warn('Background sync failed for finishFollowUp:', err);
                     // Re-render to show any server discrepancies
                     const route = document.querySelector('.nav-links li.active')?.getAttribute('data-route');
-                    if (route === 'follow-up') this.renderFollowUpView();
-                    else if (route === 'post-clinic') this.renderPostClinicBookings();
+                    if (route === 'follow-up') UI.renderFollowUpView();
+                    else if (route === 'post-clinic') UI.renderPostClinicBookings();
                 }
             }
         );
@@ -4242,14 +4354,23 @@ Oncology Coordinator System`;
                         </select>
                     </div>
                 </div>
+
+                <div>
+                    <label style="display:block; font-weight:800; margin-bottom:10px; color:var(--primary);">🏷️ نوع المتابعة:</label>
+                    <select id="print-type-filter" class="pc-select" style="width:100%; padding:10px;">
+                        <option value="ALL" ${UI.followUpTypeFilter === 'ALL' ? 'selected' : ''}>كل الأنواع</option>
+                        ${UI.FOLLOW_UP_TYPES.map(t => `<option value="${t.value}" ${UI.followUpTypeFilter === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}
+                    </select>
+                </div>
             </div>
         `, () => {
             const orientation = document.querySelector('input[name="print-orient"]:checked').value;
             const fontSize = document.getElementById('print-font-size').value;
             const planWidth = document.getElementById('print-plan-width').value;
-            
+            const typeFilter = document.getElementById('print-type-filter').value;
+
             document.getElementById('app-modal').remove();
-            UI.printFollowUpReport({ orientation, fontSize, planWidth, specificList: listType, titleOverride: title });
+            UI.printFollowUpReport({ orientation, fontSize, planWidth, specificList: listType, titleOverride: title, typeFilter });
         });
     },
 
@@ -4288,6 +4409,14 @@ Oncology Coordinator System`;
                     </div>
                 </div>
 
+                <div>
+                    <label style="display:block; font-weight:800; margin-bottom:10px; color:var(--primary);">🏷️ نوع المتابعة:</label>
+                    <select id="print-type-filter" class="pc-select" style="width:100%; padding:10px;">
+                        <option value="ALL" ${UI.followUpTypeFilter === 'ALL' ? 'selected' : ''}>كل الأنواع</option>
+                        ${UI.FOLLOW_UP_TYPES.map(t => `<option value="${t.value}" ${UI.followUpTypeFilter === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}
+                    </select>
+                </div>
+
                 <p style="font-size:0.85rem; color:var(--text-muted); background:#fffbeb; padding:10px; border-radius:8px; border:1px solid #fef3c7;">
                     💡 نصيحة: إذا كانت خطط العلاج طويلة جداً، يُفضل استخدام الوضعية بالعرض (Landscape) مع الحجم العريض جداً.
                 </p>
@@ -4296,9 +4425,10 @@ Oncology Coordinator System`;
             const orientation = document.querySelector('input[name="print-orient"]:checked').value;
             const fontSize = document.getElementById('print-font-size').value;
             const planWidth = document.getElementById('print-plan-width').value;
-            
+            const typeFilter = document.getElementById('print-type-filter').value;
+
             document.getElementById('app-modal').remove();
-            UI.printFollowUpReport({ orientation, fontSize, planWidth });
+            UI.printFollowUpReport({ orientation, fontSize, planWidth, typeFilter });
         });
     },
 
@@ -4311,18 +4441,21 @@ Oncology Coordinator System`;
         let followUps = [];
 
         pcData.forEach(b => {
-            if(b.followUpStatus === 'ACTIVE') {
-                followUps.push({
-                    id: b.id, source: 'PC',
-                    patientName: b.patientName || 'بدون اسم',
-                    patientCode: b.patientCode || '---',
-                    providerName: b.providerName || 'غير محدد',
-                    sessionDate: b.sessionDate || '---',
-                    followUpNotes: b.followUpNotes || 'لا توجد ملاحظات',
-                    followUpType: b.followUpType || '',
-                    treatmentPlan: b.treatmentPlan || '',
-                    phoneNumber: b.phoneNumber || '',
-                    isUnnotified: false, isAwaitingAppt: false
+            let activeEntries = this.getActiveFollowUps(b, false);
+            if (activeEntries.length > 0) {
+                activeEntries.forEach(entry => {
+                    followUps.push({
+                        id: b.id, source: 'PC',
+                        patientName: b.patientName || 'بدون اسم',
+                        patientCode: b.patientCode || '---',
+                        providerName: b.providerName || 'غير محدد',
+                        sessionDate: b.sessionDate || '---',
+                        followUpNotes: entry.notes || 'لا توجد ملاحظات',
+                        followUpType: entry.type || '',
+                        treatmentPlan: b.treatmentPlan || '',
+                        phoneNumber: b.phoneNumber || '',
+                        isUnnotified: false, isAwaitingAppt: false
+                    });
                 });
             } else if (b.notifiedPatient !== 'Y') {
                 if (b.opcDate && b.opcDate.trim() !== '') {
@@ -4354,21 +4487,20 @@ Oncology Coordinator System`;
         });
 
         ncData.forEach(b => {
-            let cData = this.parseNCCustomData(b.customData);
-            if(cData.followUpStatus === 'ACTIVE') {
+            this.getActiveFollowUps(b, true).forEach(entry => {
                 followUps.push({
                     id: b.id, source: 'NC',
                     patientName: b.patientName || 'بدون اسم',
                     patientCode: b.patientId || '---',
                     providerName: b.primaryPhysician || 'غير محدد',
                     sessionDate: b.sessionDate || '---',
-                    followUpNotes: cData.followUpNotes || 'لا توجد ملاحظات',
-                    followUpType: cData.followUpType || '',
+                    followUpNotes: entry.notes || 'لا توجد ملاحظات',
+                    followUpType: entry.type || '',
                     treatmentPlan: b.treatmentPlan || '',
                     phoneNumber: b.phoneNumber || '',
                     isUnnotified: false, isAwaitingAppt: false
                 });
-            }
+            });
         });
 
         if (settings.specificList) {
@@ -4381,6 +4513,10 @@ Oncology Coordinator System`;
             } else if (settings.specificList === 'ncNotified') {
                 followUps = followUps.filter(f => !f.isUnnotified && !f.isAwaitingAppt && f.source === 'NC');
             }
+        }
+
+        if (settings.typeFilter && settings.typeFilter !== 'ALL') {
+            followUps = followUps.filter(f => f.followUpType === settings.typeFilter);
         }
 
         followUps.sort((a,b) => new Date(a.sessionDate || 0) - new Date(b.sessionDate || 0));

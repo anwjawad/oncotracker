@@ -22,7 +22,7 @@ function setupDatabase() {
     "Admissions": ["patientName", "mrn", "date", "type", "location"],
     "PortCath": ["patientName", "status", "date"],
     "Communications": ["caseId", "type", "to", "date", "outcome"],
-    "PostClinicBookings": ["id", "patientName", "patientCode", "patientAge", "providerName", "treatmentPlan", "opcDate", "phoneNumber", "permit", "referral", "notifiedPatient", "sessionDate", "customData", "followUpStatus", "followUpNotes", "followUpType", "specialistNoteUrl"],
+    "PostClinicBookings": ["id", "patientName", "patientCode", "patientAge", "providerName", "treatmentPlan", "opcDate", "phoneNumber", "permit", "referral", "notifiedPatient", "sessionDate", "customData", "followUpStatus", "followUpNotes", "followUpType", "followUpsData", "specialistNoteUrl"],
     "NewCasesMeeting": ["id", "patientName", "patientId", "briefHistory", "treatmentPlan", "primaryPhysician", "notes", "sessionDate", "customData"]
   };
   

@@ -15,7 +15,7 @@
 var SCHEMA = {
   Patients: ['id', 'mrn', 'name', 'phone', 'phone2', 'age', 'gender', 'physician', 'diagnosis', 'notes', 'phoneFlag', 'ignoredIssues', 'mergedInto', 'createdAt', 'updatedAt', 'deleted'],
   ClinicVisits: ['id', 'patientId', 'sessionDate', 'physician', 'plan', 'opcDate', 'permit', 'referral', 'notified', 'noteUrl', 'autoClosed', 'custom', 'createdAt', 'updatedAt', 'deleted'],
-  CommitteeCases: ['id', 'patientId', 'sessionDate', 'physician', 'briefHistory', 'question', 'plan', 'decision', 'status', 'notes', 'sourceVisitId', 'carriedFromId', 'deferredToId', 'decidedAt', 'addenda', 'createdAt', 'updatedAt', 'deleted'],
+  CommitteeCases: ['id', 'patientId', 'sessionDate', 'physician', 'briefHistory', 'question', 'plan', 'decision', 'status', 'ready', 'notes', 'sourceVisitId', 'carriedFromId', 'deferredToId', 'decidedAt', 'addenda', 'createdAt', 'updatedAt', 'deleted'],
   FollowUps: ['id', 'patientId', 'sourceType', 'sourceId', 'type', 'title', 'dueDate', 'status', 'outcome', 'attempts', 'createdAt', 'closedAt', 'updatedAt', 'deleted'],
   Activity: ['id', 'at', 'by', 'table', 'rowId', 'patientId', 'action', 'summary', 'changes']
 };

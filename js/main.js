@@ -4,9 +4,10 @@ import { settings, applyTheme } from './settings.js';
 import { api } from './api.js';
 import { store, subscribe, loadCache, sync, flush, idx } from './store.js';
 import { issues, overdueCount } from './rules.js';
-import { actions, changes, hooks, ui } from './registry.js';
+import { actions, changes, hooks } from './registry.js';
 import { closeMenus, toggleMenu, toast } from './ui.js';
 import { renderDrawer, openPatient, drawerState, closeDrawer } from './patient.js';
+import { tr, lang, applyLang } from './i18n.js';
 import * as today from './views/today.js';
 import * as committee from './views/committee.js';
 import * as clinic from './views/clinic.js';
@@ -49,9 +50,32 @@ function render() {
 let pendingRender = false;
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(render, 0); } });
 
+const NAV = {
+  today: ['اليوم', 'Today'],
+  committee: ['لجنة الحالات الجديدة', 'New cases committee'],
+  clinic: ['حجوزات ما بعد العيادة', 'Post-clinic bookings'],
+  followups: ['المتابعات', 'Follow-ups'],
+  patients: ['المرضى', 'Patients'],
+  quality: ['تصحيح البيانات', 'Data fixes'],
+  reports: ['التقارير', 'Reports'],
+  settings: ['الإعدادات', 'Settings'],
+};
+
 function renderChrome() {
-  $('#page-title').textContent = ROUTES[current].title;
-  $$('.nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === current));
+  const view = ROUTES[current];
+  const pageTitle = typeof view.title === 'function' ? view.title() : view.title;
+  $('#page-title').textContent = pageTitle;
+  document.title = `${pageTitle} · ${tr('منسّق الأورام', 'Onco Tracker')}`;
+  $$('.nav a').forEach((a) => {
+    a.classList.toggle('active', a.dataset.route === current);
+    const label = a.querySelector('.label');
+    if (label) label.textContent = NAV[a.dataset.route][lang() === 'en' ? 1 : 0];
+  });
+  $('#brand-name').textContent = tr('منسّق الأورام', 'Onco Tracker');
+  $('#brand-sub').textContent = lang() === 'en' ? 'Oncology department' : settings.get('department') || 'قسم الأورام';
+  $('#global-search').placeholder = tr('ابحث عن مريض بالاسم أو رقم الملف (Ctrl+K)', 'Find a patient by name or file number (Ctrl+K)');
+  $('#lang-btn').textContent = lang() === 'en' ? 'ع' : 'EN';
+  $('#lang-btn').title = lang() === 'en' ? 'التبديل إلى العربية' : 'Switch to English';
   const od = overdueCount();
   const high = issues().filter((i) => i.sev === 'high').length;
   $('[data-count=followups]').textContent = od || '';
@@ -59,17 +83,16 @@ function renderChrome() {
   const nextDate = committee.nextSession();
   const n = idx().lists.committee.filter((c) => c.sessionDate === nextDate).length;
   $('[data-count=committee]').textContent = n || '';
-  $('#brand-sub').textContent = settings.get('department') || 'قسم الأورام';
   renderBanner();
 }
 
 function renderBanner() {
   const banner = $('#mode-banner');
   if (api.mode() === 'local') {
-    banner.innerHTML = 'وضع تجريبي: البيانات محفوظة على هذا الجهاز فقط ولا تصل للفريق. <a href="#/settings">إيقافه من الإعدادات</a>.';
+    banner.innerHTML = tr('وضع تجريبي: البيانات محفوظة على هذا الجهاز فقط ولا تصل للفريق. <a href="#/settings">إيقافه من الإعدادات</a>.', 'Demo mode: data stays on this device and is not shared with the team. <a href="#/settings">Turn it off in Settings</a>.');
     banner.hidden = false;
   } else if (store.status.oldBackend) {
-    banner.innerHTML = 'التطبيق متصل بملف Google Sheets، لكن خادم Apps Script ما زال على النسخة القديمة، فلا تُحفظ التعديلات بعد. انشر ملف <b>backend/Code.gs</b> الجديد (الخطوات في README)، وإلى ذلك الحين استخدم <a href="backup/">النسخة القديمة</a>.';
+    banner.innerHTML = tr('التطبيق متصل بملف Google Sheets، لكن خادم Apps Script ما زال على النسخة القديمة، فلا تُحفظ التعديلات بعد. انشر ملف <b>backend/Code.gs</b> الجديد (الخطوات في README)، وإلى ذلك الحين استخدم <a href="backup/">النسخة القديمة</a>.', 'The app reaches the Google Sheet, but Apps Script still runs the old code, so changes are not saved yet. Deploy the new <b>backend/Code.gs</b> (steps in the README); until then use the <a href="backup/">old version</a>.');
     banner.hidden = false;
   } else banner.hidden = true;
 }
@@ -78,18 +101,25 @@ function renderStatus() {
   const pill = $('#sync-pill');
   const s = store.status;
   const labels = {
-    idle: 'جاهز', syncing: 'جاري المزامنة…', saving: `جاري الحفظ (${s.pending})`, saved: 'كل التعديلات محفوظة',
-    error: `لم يُحفظ ${s.pending} تعديل — إعادة المحاولة`, offline: `بدون اتصال — ${s.pending} بالانتظار`,
+    idle: tr('جاهز', 'Ready'), syncing: tr('جاري المزامنة…', 'Syncing…'), saving: tr(`جاري الحفظ (${s.pending})`, `Saving (${s.pending})`), saved: tr('كل التعديلات محفوظة', 'All changes saved'),
+    error: tr(`لم يُحفظ ${s.pending} تعديل — إعادة المحاولة`, `${s.pending} not saved — retrying`), offline: tr(`بدون اتصال — ${s.pending} بالانتظار`, `Offline — ${s.pending} waiting`),
   };
   pill.dataset.state = s.state;
-  pill.querySelector('.label').textContent = api.mode() === 'local' && s.state === 'saved' ? 'محفوظ على هذا الجهاز' : labels[s.state] || '';
-  pill.title = s.error || 'مزامنة الآن';
+  pill.querySelector('.label').textContent = api.mode() === 'local' && s.state === 'saved' ? tr('محفوظ على هذا الجهاز', 'Saved on this device') : labels[s.state] || '';
+  pill.title = s.error || tr('مزامنة الآن', 'Sync now');
   renderBanner();
 }
 
 const scheduleRender = debounce(render, 30);
 hooks.rerender = scheduleRender;
 subscribe((evt) => { renderStatus(); if (evt?.statusOnly) return; if (!STABLE.has(current)) scheduleRender(); else renderChrome(); });
+
+function switchLanguage(next) {
+  settings.set({ lang: next });
+  applyLang();
+  render();
+  renderStatus();
+}
 
 // ---------- routing ----------
 function route() {
@@ -117,6 +147,7 @@ document.addEventListener('click', async (e) => {
   if (name === 'menu') { e.preventDefault(); toggleMenu(el); return; }
   if (name === 'toggle-rail') { document.body.classList.toggle('rail-open'); return; }
   if (name === 'sync-now') { manualSync(); return; }
+  if (name === 'toggle-lang') { switchLanguage(lang() === 'en' ? 'ar' : 'en'); return; }
   const fn = actions[name];
   if (!fn) return;
   if (el.tagName !== 'A') e.preventDefault();
@@ -125,7 +156,7 @@ document.addEventListener('click', async (e) => {
     await fn(el, e);
   } catch (err) {
     console.error(err);
-    toast('حدث خطأ: ' + err.message, { type: 'error' });
+    toast(`${tr('حدث خطأ', 'Something went wrong')}: ${err.message}`, { type: 'error' });
   }
   if (!STABLE.has(current)) scheduleRender();
 });
@@ -136,7 +167,7 @@ function onChange(e) {
   const fn = changes[el.dataset.change];
   if (!fn) return;
   el.defaultValue = el.value;   // committed: no longer "dirty"
-  try { fn(el, e); } catch (err) { console.error(err); toast('حدث خطأ: ' + err.message, { type: 'error' }); }
+  try { fn(el, e); } catch (err) { console.error(err); toast(`${tr('حدث خطأ', 'Something went wrong')}: ${err.message}`, { type: 'error' }); }
   scheduleRender();
 }
 document.addEventListener('change', onChange);
@@ -161,7 +192,7 @@ function renderGlobal() {
   gIndex = 0;
   gResults.innerHTML = hits.length
     ? hits.map((p, i) => `<button type="button" class="result ${i === 0 ? 'hi' : ''}" data-gid="${esc(p.id)}"><span>${esc(p.name)}</span><span class="meta ltr">${esc(p.mrn || '—')}${p.phone ? ' · ' + esc(p.phone) : ''}</span></button>`).join('')
-    : '<div class="empty" style="padding:14px">لا يوجد مريض بهذا الاسم أو الرقم.</div>';
+    : `<div class="empty" style="padding:14px">${esc(tr('لا يوجد مريض بهذا الاسم أو الرقم.', 'No patient with this name or number.'))}</div>`;
   gResults.hidden = false;
 }
 gInput.addEventListener('input', debounce(renderGlobal, 120));
@@ -189,22 +220,23 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- sync ----------
 async function manualSync() {
-  try { await sync(); toast('البيانات محدّثة'); }
-  catch (e) { toast('تعذّرت المزامنة: ' + e.message, { type: 'error' }); }
+  try { await sync(); toast(tr('البيانات محدّثة', 'Up to date')); }
+  catch (e) { toast(`${tr('تعذّرت المزامنة', 'Sync failed')}: ${e.message}`, { type: 'error' }); }
 }
 window.addEventListener('online', () => { flush(); sync().catch(() => {}); });
 setInterval(() => { if (document.visibilityState === 'visible') sync().catch(() => {}); }, 120000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync().catch(() => {}); });
-document.addEventListener('settings-changed', () => (current === 'settings' ? render() : renderChrome()));
+document.addEventListener('settings-changed', () => { applyLang(); if (current === 'settings') render(); else renderChrome(); renderStatus(); });
 window.addEventListener('beforeunload', (e) => { if (store.status.pending) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- boot ----------
 applyTheme();
+applyLang();
 const hadCache = loadCache();
 route();
 renderStatus();
 sync().catch((e) => {
-  if (!hadCache) toast('تعذّر تحميل البيانات: ' + e.message, { type: 'error' });
+  if (!hadCache) toast(`${tr('تعذّر تحميل البيانات', 'Could not load data')}: ${e.message}`, { type: 'error' });
 });
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

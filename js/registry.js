@@ -13,6 +13,7 @@ export const navigate = (route, params) => hooks.navigate(route, params);
 export const ui = {
   committeeDate: '',
   committeeFilter: 'all',
+  committeeDoctor: 'ALL',
   committeeQuery: '',
   clinicDate: '',
   clinicDoctor: 'ALL',

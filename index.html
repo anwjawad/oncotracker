@@ -22,21 +22,21 @@
           <path d="M10.5 28 18 17M21.5 28 14 17"/>
         </svg>
         <div>
-          <strong>منسّق الأورام</strong>
+          <strong id="brand-name">منسّق الأورام</strong>
           <span id="brand-sub">قسم الأورام</span>
         </div>
       </div>
       <ul class="nav">
-        <li><a href="#/today" data-route="today">اليوم</a></li>
-        <li><a href="#/committee" data-route="committee">لجنة الحالات الجديدة <b class="count" data-count="committee"></b></a></li>
-        <li><a href="#/clinic" data-route="clinic">حجوزات ما بعد العيادة</a></li>
-        <li><a href="#/followups" data-route="followups">المتابعات <b class="count warn" data-count="followups"></b></a></li>
-        <li><a href="#/patients" data-route="patients">المرضى</a></li>
-        <li><a href="#/quality" data-route="quality">تصحيح البيانات <b class="count" data-count="quality"></b></a></li>
-        <li><a href="#/reports" data-route="reports">التقارير</a></li>
+        <li><a href="#/today" data-route="today"><span class="label">اليوم</span></a></li>
+        <li><a href="#/committee" data-route="committee"><span class="label">لجنة الحالات الجديدة</span> <b class="count" data-count="committee"></b></a></li>
+        <li><a href="#/clinic" data-route="clinic"><span class="label">حجوزات ما بعد العيادة</span></a></li>
+        <li><a href="#/followups" data-route="followups"><span class="label">المتابعات</span> <b class="count warn" data-count="followups"></b></a></li>
+        <li><a href="#/patients" data-route="patients"><span class="label">المرضى</span></a></li>
+        <li><a href="#/quality" data-route="quality"><span class="label">تصحيح البيانات</span> <b class="count" data-count="quality"></b></a></li>
+        <li><a href="#/reports" data-route="reports"><span class="label">التقارير</span></a></li>
       </ul>
       <ul class="nav nav-foot">
-        <li><a href="#/settings" data-route="settings">الإعدادات</a></li>
+        <li><a href="#/settings" data-route="settings"><span class="label">الإعدادات</span></a></li>
       </ul>
     </nav>
 
@@ -51,6 +51,7 @@
           <input id="global-search" type="search" placeholder="ابحث عن مريض بالاسم أو رقم الملف (Ctrl+K)" autocomplete="off" aria-label="بحث عن مريض">
           <div id="global-results" class="results" hidden></div>
         </div>
+        <button id="lang-btn" class="btn btn-sm lang-btn" data-action="toggle-lang">EN</button>
         <button id="sync-pill" class="sync-pill" data-action="sync-now" title="مزامنة الآن">
           <span class="dot"></span><span class="label">جاري التحميل…</span>
         </button>

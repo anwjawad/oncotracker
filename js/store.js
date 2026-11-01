@@ -7,6 +7,7 @@
 import { api } from './api.js';
 import { settings } from './settings.js';
 import { uid, nowISO, normMrn } from './util.js';
+import { tr } from './i18n.js';
 
 export const TABLES = ['patients', 'visits', 'committee', 'followups'];
 const PREFIX = { patients: 'P', visits: 'V', committee: 'C', followups: 'F', activity: 'A' };
@@ -192,7 +193,7 @@ export function upsert(table, patch, audit) {
 
 export const create = (table, fields, audit) => upsert(table, { id: uid(PREFIX[table]), ...fields }, audit === false ? false : { action: 'create', ...(audit || {}) });
 export const remove = (table, id, audit) => upsert(table, { id, deleted: true }, { action: 'delete', ...(audit || {}) });
-export const restore = (table, id) => upsert(table, { id, deleted: false }, { action: 'restore', summary: 'تراجع عن الحذف' });
+export const restore = (table, id) => upsert(table, { id, deleted: false }, { action: 'restore', summary: tr('تراجع عن الحذف', 'Undid delete') });
 
 export function note(summary, patientId = '', table = '', rowId = '') {
   const entry = { id: uid('A'), at: nowISO(), by: settings.get('userName') || '', table, rowId, patientId, action: 'note', summary, changes: [] };

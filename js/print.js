@@ -2,12 +2,14 @@
 import { esc, fmtDate, todayISO } from './util.js';
 import { settings } from './settings.js';
 import { toast } from './ui.js';
+import { tr, lang } from './i18n.js';
 
 const cell = (v) => esc(v ?? '').replace(/\n/g, '<br>');
 
 // columns: [{ label, width? }]; rows: arrays of plain strings (escaped here).
 export function printTable({ title, subtitle = '', columns, rows, landscape = true, footer = '' }) {
   const s = settings.all();
+  const rtl = lang() !== 'en';
   const head = `
     <header>
       <div class="org">
@@ -15,9 +17,9 @@ export function printTable({ title, subtitle = '', columns, rows, landscape = tr
         <div>${s.hospital ? `<strong>${esc(s.hospital)}</strong>` : ''}${s.department ? `<span>${esc(s.department)}</span>` : ''}</div>
       </div>
       <div class="ttl"><h1>${esc(title)}</h1>${subtitle ? `<p>${esc(subtitle)}</p>` : ''}</div>
-      <div class="date">طُبع ${esc(fmtDate(todayISO(), 'long'))}</div>
+      <div class="date">${esc(tr('طُبع', 'Printed'))} ${esc(fmtDate(todayISO(), 'long'))}</div>
     </header>`;
-  const doc = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  const doc = `<!DOCTYPE html><html lang="${lang()}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="UTF-8"><title>${esc(title)}</title>
     <style>
       @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }
       body { font-family: "IBM Plex Sans Arabic", Tahoma, sans-serif; color: #111; margin: 0; font-size: 12px; }
@@ -25,9 +27,9 @@ export function printTable({ title, subtitle = '', columns, rows, landscape = tr
       .org { display: flex; gap: 10px; align-items: center; } .org img { max-height: 54px; max-width: 150px; }
       .org strong { display: block; font-size: 14px; } .org span { color: #444; }
       .ttl { text-align: center; } .ttl h1 { margin: 0; font-size: 17px; } .ttl p { margin: 2px 0 0; color: #444; }
-      .date { text-align: left; color: #555; }
+      .date { text-align: end; color: #555; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #555; padding: 6px 7px; text-align: right; vertical-align: top; }
+      th, td { border: 1px solid #555; padding: 6px 7px; text-align: start; vertical-align: top; }
       th { background: #ECEDF3; font-size: 11.5px; }
       tr { page-break-inside: avoid; }
       td.n { text-align: center; color: #555; width: 22px; }
@@ -40,7 +42,7 @@ export function printTable({ title, subtitle = '', columns, rows, landscape = tr
     <script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };<\/script>
     </body></html>`;
   const w = window.open('', '_blank');
-  if (!w) { toast('اسمح للمتصفح بفتح النوافذ المنبثقة لهذا الموقع حتى تعمل الطباعة.', { type: 'error' }); return; }
+  if (!w) { toast(tr('اسمح للمتصفح بفتح النوافذ المنبثقة لهذا الموقع حتى تعمل الطباعة.', 'Allow pop-ups for this site so printing can open.'), { type: 'error' }); return; }
   w.document.open();
   w.document.write(doc);
   w.document.close();

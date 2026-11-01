@@ -1,33 +1,38 @@
 // Domain rules: vocabularies, data-quality checks, and automatic follow-ups.
 import { idx, store } from './store.js';
 import { normMrn, normName, cleanName, phoneDigits, latinDigits, wordCount, todayISO, addDays } from './util.js';
+import { tr, lang } from './i18n.js';
+
+// Vocabulary entry with a .l getter that returns the label in the current language.
+const term = (v, ar, en, extra = {}) => ({ v, ar, en, ...extra, get l() { return lang() === 'en' ? this.en : this.ar; } });
 
 export const FU_TYPES = [
-  { v: 'NOTIFY', l: 'تبليغ المريض' },
-  { v: 'APPOINTMENT', l: 'حجز موعد' },
-  { v: 'REFERRAL', l: 'تحويل' },
-  { v: 'PERMIT', l: 'تصريح' },
-  { v: 'TESTS', l: 'فحوصات وصور' },
-  { v: 'RESULTS', l: 'متابعة نتيجة' },
-  { v: 'COMMUNICATE', l: 'تواصل مع المريض' },
-  { v: 'OTHER', l: 'أخرى' },
+  term('NOTIFY', 'تبليغ المريض', 'Notify patient'),
+  term('APPOINTMENT', 'حجز موعد', 'Book appointment'),
+  term('REFERRAL', 'تحويل', 'Referral'),
+  term('PERMIT', 'تصريح', 'Permit'),
+  term('TESTS', 'فحوصات وصور', 'Tests & imaging'),
+  term('RESULTS', 'متابعة نتيجة', 'Follow up result'),
+  term('COMMUNICATE', 'تواصل مع المريض', 'Contact patient'),
+  term('OTHER', 'أخرى', 'Other'),
 ];
-export const fuLabel = (v) => FU_TYPES.find((t) => t.v === v)?.l || 'أخرى';
+export const fuLabel = (v) => (FU_TYPES.find((t) => t.v === v) || FU_TYPES.at(-1)).l;
 
 export const ATTEMPT_RESULTS = [
-  { v: 'NO_ANSWER', l: 'لم يرد' },
-  { v: 'OFF', l: 'الهاتف مغلق' },
-  { v: 'WRONG', l: 'رقم خاطئ' },
-  { v: 'REACHED', l: 'تم التواصل، ينتظر إجراء' },
-  { v: 'OTHER', l: 'أخرى' },
+  term('NO_ANSWER', 'لم يرد', 'No answer'),
+  term('OFF', 'الهاتف مغلق', 'Phone off'),
+  term('WRONG', 'رقم خاطئ', 'Wrong number'),
+  term('REACHED', 'تم التواصل، ينتظر إجراء', 'Reached, action pending'),
+  term('OTHER', 'أخرى', 'Other'),
 ];
 export const attemptLabel = (v) => ATTEMPT_RESULTS.find((t) => t.v === v)?.l || v;
 
 export const CASE_STATUS = {
-  listed: { l: 'مُدرج', chip: '' },
-  presented: { l: 'عُرض', chip: 'accent' },
-  deferred: { l: 'مؤجّل', chip: 'amber' },
-  withdrawn: { l: 'مسحوب', chip: '' },
+  listed: term('listed', 'مُدرج', 'Listed', { chip: '' }),
+  ready: term('ready', 'جاهز', 'Ready', { chip: 'blue' }),
+  presented: term('presented', 'عُرض', 'Presented', { chip: 'accent' }),
+  deferred: term('deferred', 'مؤجّل', 'Deferred', { chip: 'amber' }),
+  withdrawn: term('withdrawn', 'مسحوب', 'Withdrawn', { chip: '' }),
 };
 
 // Words in a clinic plan that suggest the patient should go to the committee.
@@ -37,17 +42,18 @@ export const suggestsCommittee = (plan) => COMMITTEE_HINTS.some((k) => String(pl
 // ---------- committee readiness ----------
 export function readiness(c, p) {
   const items = [
-    { k: 'mrn', l: 'رقم الملف', ok: !!normMrn(p?.mrn) },
-    { k: 'history', l: 'القصة المرضية', ok: !!String(c.briefHistory || '').trim() },
-    { k: 'question', l: 'السؤال أو الخطة', ok: !!String(c.question || c.plan || '').trim() },
-    { k: 'physician', l: 'الطبيب', ok: !!String(c.physician || '').trim() },
+    { k: 'mrn', l: tr('رقم الملف', 'File number'), ok: !!normMrn(p?.mrn) },
+    { k: 'history', l: tr('القصة المرضية', 'Brief history'), ok: !!String(c.briefHistory || '').trim() },
+    { k: 'question', l: tr('السؤال أو الخطة', 'Question or plan'), ok: !!String(c.question || c.plan || '').trim() },
+    { k: 'physician', l: tr('الطبيب', 'Doctor'), ok: !!String(c.physician || '').trim() },
   ];
   return { items, ready: items.every((i) => i.ok), missing: items.filter((i) => !i.ok) };
 }
 
+// The coordinator's "Ready" mark overrides the checklist.
 export function caseStage(c, p) {
   if (c.status === 'presented' || c.status === 'deferred' || c.status === 'withdrawn') return c.status;
-  return readiness(c, p).ready ? 'ready' : 'listed';
+  return c.ready === '1' || readiness(c, p).ready ? 'ready' : 'listed';
 }
 
 // ---------- automatic follow-ups derived from clinic visits ----------
@@ -67,13 +73,13 @@ export function autoTasks() {
       if (v.opcDate < today) continue;
       out.push({
         id: `auto:NOTIFY:${v.id}`, auto: 'NOTIFY', patientId: v.patientId, sourceType: 'visit', sourceId: v.id,
-        type: 'NOTIFY', title: 'تبليغ المريض بموعد العيادة', dueDate: addDays(v.sessionDate || todayISO(), 1),
+        type: 'NOTIFY', title: tr('تبليغ المريض بموعد العيادة', 'Notify patient of clinic appointment'), dueDate: addDays(v.sessionDate || todayISO(), 1),
         status: 'open', attempts: [], physician: v.physician, visit: v,
       });
     } else if (String(v.plan || '').trim() && v.sessionDate >= oldest) {
       out.push({
         id: `auto:BOOK:${v.id}`, auto: 'BOOK', patientId: v.patientId, sourceType: 'visit', sourceId: v.id,
-        type: 'APPOINTMENT', title: 'تحديد موعد العيادة القادم', dueDate: addDays(v.sessionDate || todayISO(), 3),
+        type: 'APPOINTMENT', title: tr('تحديد موعد العيادة القادم', 'Set next clinic appointment'), dueDate: addDays(v.sessionDate || todayISO(), 3),
         status: 'open', attempts: [], physician: v.physician, visit: v,
       });
     }
@@ -93,17 +99,17 @@ export function overdueCount() {
 
 // ---------- data quality ----------
 export const ISSUE_DEFS = {
-  DUP_MRN: { sev: 'high', l: 'رقم ملف مكرر لأكثر من مريض', fix: 'merge' },
-  DUP_NAME: { sev: 'mid', l: 'اسم مكرر — قد يكون نفس المريض', fix: 'merge' },
-  NO_MRN: { sev: 'high', l: 'بدون رقم ملف', fix: 'edit', field: 'mrn' },
-  PHONE_WRONG: { sev: 'high', l: 'الرقم أُبلغ أنه خاطئ أثناء المتابعة', fix: 'edit', field: 'phone' },
-  NO_PHONE: { sev: 'mid', l: 'بدون رقم هاتف', fix: 'edit', field: 'phone' },
-  PHONE_FORMAT: { sev: 'mid', l: 'رقم هاتف بصيغة غير صحيحة', fix: 'edit', field: 'phone' },
-  MRN_FORMAT: { sev: 'low', l: 'رقم الملف يحتاج تنسيق', fix: 'auto' },
-  NAME_FORMAT: { sev: 'low', l: 'مسافات أو أرقام عربية في الاسم', fix: 'auto' },
-  SHORT_NAME: { sev: 'low', l: 'اسم مختصر (قد يكون مقطوعاً)', fix: 'edit', field: 'name' },
-  NO_PHYSICIAN: { sev: 'mid', l: 'زيارة أو حالة بدون طبيب', fix: 'record' },
-  OPC_BEFORE: { sev: 'mid', l: 'موعد العيادة قبل تاريخ الجلسة', fix: 'record' },
+  DUP_MRN: term('DUP_MRN', 'رقم ملف مكرر لأكثر من مريض', 'File number used by more than one patient', { sev: 'high', fix: 'merge' }),
+  DUP_NAME: term('DUP_NAME', 'اسم مكرر — قد يكون نفس المريض', 'Same name, possibly the same patient', { sev: 'mid', fix: 'merge' }),
+  NO_MRN: term('NO_MRN', 'بدون رقم ملف', 'No file number', { sev: 'high', fix: 'edit', field: 'mrn' }),
+  PHONE_WRONG: term('PHONE_WRONG', 'الرقم أُبلغ أنه خاطئ أثناء المتابعة', 'Phone reported wrong during follow-up', { sev: 'high', fix: 'edit', field: 'phone' }),
+  NO_PHONE: term('NO_PHONE', 'بدون رقم هاتف', 'No phone number', { sev: 'mid', fix: 'edit', field: 'phone' }),
+  PHONE_FORMAT: term('PHONE_FORMAT', 'رقم هاتف بصيغة غير صحيحة', 'Phone number in a wrong format', { sev: 'mid', fix: 'edit', field: 'phone' }),
+  MRN_FORMAT: term('MRN_FORMAT', 'رقم الملف يحتاج تنسيق', 'File number needs formatting', { sev: 'low', fix: 'auto' }),
+  NAME_FORMAT: term('NAME_FORMAT', 'مسافات أو أرقام عربية في الاسم', 'Extra spaces or Arabic digits in name', { sev: 'low', fix: 'auto' }),
+  SHORT_NAME: term('SHORT_NAME', 'اسم مختصر (قد يكون مقطوعاً)', 'Short name (may be truncated)', { sev: 'low', fix: 'edit', field: 'name' }),
+  NO_PHYSICIAN: term('NO_PHYSICIAN', 'زيارة أو حالة بدون طبيب', 'Visit or case without a doctor', { sev: 'mid', fix: 'record' }),
+  OPC_BEFORE: term('OPC_BEFORE', 'موعد العيادة قبل تاريخ الجلسة', 'Clinic appointment before session date', { sev: 'mid', fix: 'record' }),
 };
 
 export function phoneProblem(phone) {
@@ -126,13 +132,13 @@ export function computeIssues() {
   const issues = [];
   const today = todayISO();
   const ignored = (p, key) => (p.ignoredIssues || []).includes(key);
-  const push = (code, extra) => issues.push({ code, ...ISSUE_DEFS[code], ...extra });
+  const push = (code, extra) => { const d = ISSUE_DEFS[code]; issues.push({ code, l: d.l, sev: d.sev, fix: d.fix, field: d.field, ...extra }); };
 
   const inDupMrn = new Set();
   for (const [mrn, ps] of byMrn) {
     if (ps.length < 2) continue;
     ps.forEach((p) => inDupMrn.add(p.id));
-    push('DUP_MRN', { key: `DUP_MRN:${mrn}`, patients: ps, patientId: ps[0].id, detail: `رقم الملف ${mrn}` });
+    push('DUP_MRN', { key: `DUP_MRN:${mrn}`, patients: ps, patientId: ps[0].id, detail: `${tr('رقم الملف', 'File no.')} ${mrn}` });
   }
 
   const byName = new Map();
@@ -146,7 +152,7 @@ export function computeIssues() {
     if (ps.length < 2 || ps.every((p) => inDupMrn.has(p.id))) continue;
     const key = `DUP_NAME:${ps.map((p) => p.id).sort().join('+')}`;
     if (ps.some((p) => ignored(p, key))) continue;
-    push('DUP_NAME', { key, patients: ps, patientId: ps[0].id, detail: ps.map((p) => p.mrn || 'بدون رقم').join(' / ') });
+    push('DUP_NAME', { key, patients: ps, patientId: ps[0].id, detail: ps.map((p) => p.mrn || tr('بدون رقم', 'no number')).join(' / ') });
   }
 
   for (const p of lists.patients) {
@@ -157,7 +163,7 @@ export function computeIssues() {
 
     if (p.phoneFlag === 'wrong') push('PHONE_WRONG', { key: k('PHONE_WRONG'), patientId: p.id, detail: p.phone });
     else if (!String(p.phone || '').trim()) {
-      if (!ignored(p, k('NO_PHONE'))) push('NO_PHONE', { key: k('NO_PHONE'), patientId: p.id, sev: hasFuture ? 'high' : 'mid', detail: hasFuture ? 'لديه موعد أو متابعة مفتوحة' : '' });
+      if (!ignored(p, k('NO_PHONE'))) push('NO_PHONE', { key: k('NO_PHONE'), patientId: p.id, sev: hasFuture ? 'high' : 'mid', detail: hasFuture ? tr('لديه موعد أو متابعة مفتوحة', 'Has an appointment or open follow-up') : '' });
     } else {
       const pp = phoneProblem(p.phone);
       if (pp && !ignored(p, k('PHONE_FORMAT'))) push('PHONE_FORMAT', { key: k('PHONE_FORMAT'), patientId: p.id, detail: pp.fixable ? `${p.phone} ← ${pp.value}` : p.phone, autofix: pp.fixable ? { phone: pp.value } : null });
@@ -168,20 +174,20 @@ export function computeIssues() {
   }
 
   for (const v of lists.visits) {
-    if (!String(v.physician || '').trim()) push('NO_PHYSICIAN', { key: `NO_PHYSICIAN:${v.id}`, patientId: v.patientId, record: { table: 'visits', id: v.id }, detail: `زيارة ${v.sessionDate}` });
-    if (v.opcDate && v.sessionDate && v.opcDate < v.sessionDate) push('OPC_BEFORE', { key: `OPC_BEFORE:${v.id}`, patientId: v.patientId, record: { table: 'visits', id: v.id }, detail: `الجلسة ${v.sessionDate} — الموعد ${v.opcDate}` });
+    if (!String(v.physician || '').trim()) push('NO_PHYSICIAN', { key: `NO_PHYSICIAN:${v.id}`, patientId: v.patientId, record: { table: 'visits', id: v.id }, detail: `${tr('زيارة', 'Visit')} ${v.sessionDate}` });
+    if (v.opcDate && v.sessionDate && v.opcDate < v.sessionDate) push('OPC_BEFORE', { key: `OPC_BEFORE:${v.id}`, patientId: v.patientId, record: { table: 'visits', id: v.id }, detail: `${tr('الجلسة', 'Session')} ${v.sessionDate} — ${tr('الموعد', 'Appointment')} ${v.opcDate}` });
   }
   for (const c of lists.committee) {
-    if (!String(c.physician || '').trim() && c.status !== 'withdrawn') push('NO_PHYSICIAN', { key: `NO_PHYSICIAN:${c.id}`, patientId: c.patientId, record: { table: 'committee', id: c.id }, detail: `لجنة ${c.sessionDate}` });
+    if (!String(c.physician || '').trim() && c.status !== 'withdrawn') push('NO_PHYSICIAN', { key: `NO_PHYSICIAN:${c.id}`, patientId: c.patientId, record: { table: 'committee', id: c.id }, detail: `${tr('لجنة', 'Committee')} ${c.sessionDate}` });
   }
 
   const order = { high: 0, mid: 1, low: 2 };
   return issues.sort((a, b) => order[a.sev] - order[b.sev]);
 }
 
-let issueMemo = { v: -1, list: [] };
+let issueMemo = { v: -1, lang: '', list: [] };
 export function issues() {
-  if (issueMemo.v !== store.version) issueMemo = { v: store.version, list: computeIssues() };
+  if (issueMemo.v !== store.version || issueMemo.lang !== lang()) issueMemo = { v: store.version, lang: lang(), list: computeIssues() };
   return issueMemo.list;
 }
 export const issuesFor = (patientId) => issues().filter((i) => i.patientId === patientId || i.patients?.some((p) => p.id === patientId));

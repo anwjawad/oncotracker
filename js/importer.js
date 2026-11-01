@@ -5,18 +5,19 @@ import { html, esc, loadXLSX, readFileAs, normMrn, normName, cleanName, cleanPhy
 import { idx, create, upsert, batch, note } from './store.js';
 import { fixPhone } from './rules.js';
 import { modal, toast } from './ui.js';
+import { tr } from './i18n.js';
 
 const FIELDS = {
-  name: { l: 'اسم المريض', k: ['patient name', 'patient', 'name', 'اسم المريض', 'الاسم', 'اسم', 'المريض'] },
-  mrn: { l: 'رقم الملف', k: ['mrn', 'file', 'fn', 'code', 'id', 'رقم الملف', 'الملف', 'كود', 'رقم'] },
-  age: { l: 'العمر', k: ['age', 'العمر', 'عمر'] },
-  phone: { l: 'الهاتف', k: ['phone', 'mobile', 'tel', 'هاتف', 'جوال', 'موبايل'] },
-  physician: { l: 'الطبيب', k: ['provider', 'physician', 'doctor', 'consultant', 'طبيب', 'دكتور'] },
-  plan: { l: 'خطة العلاج', k: ['plan', 'treatment', 'خطة', 'الخطة'] },
-  opcDate: { l: 'موعد العيادة', k: ['opc', 'appointment', 'next visit', 'موعد'] },
-  history: { l: 'القصة المرضية', k: ['history', 'brief', 'قصة', 'تاريخ مرضي'] },
-  question: { l: 'السؤال / الخطة المقترحة', k: ['question', 'plan', 'سؤال', 'خطة'] },
-  notes: { l: 'ملاحظات', k: ['note', 'remark', 'ملاحظ'] },
+  name: { l: () => tr('اسم المريض', 'Patient name'), k: ['patient name', 'patient', 'name', 'اسم المريض', 'الاسم', 'اسم', 'المريض'] },
+  mrn: { l: () => tr('رقم الملف', 'File number'), k: ['mrn', 'file', 'fn', 'code', 'id', 'رقم الملف', 'الملف', 'كود', 'رقم'] },
+  age: { l: () => tr('العمر', 'Age'), k: ['age', 'العمر', 'عمر'] },
+  phone: { l: () => tr('الهاتف', 'Phone'), k: ['phone', 'mobile', 'tel', 'هاتف', 'جوال', 'موبايل'] },
+  physician: { l: () => tr('الطبيب', 'Doctor'), k: ['provider', 'physician', 'doctor', 'consultant', 'طبيب', 'دكتور'] },
+  plan: { l: () => tr('خطة العلاج', 'Treatment plan'), k: ['plan', 'treatment', 'خطة', 'الخطة'] },
+  opcDate: { l: () => tr('موعد العيادة', 'Clinic appointment'), k: ['opc', 'appointment', 'next visit', 'موعد'] },
+  history: { l: () => tr('القصة المرضية', 'Brief history'), k: ['history', 'brief', 'قصة', 'تاريخ مرضي'] },
+  question: { l: () => tr('السؤال / الخطة المقترحة', 'Question / proposed plan'), k: ['question', 'plan', 'سؤال', 'خطة'] },
+  notes: { l: () => tr('ملاحظات', 'Notes'), k: ['note', 'remark', 'ملاحظ'] },
 };
 const TARGET_FIELDS = {
   clinic: ['name', 'mrn', 'age', 'phone', 'physician', 'plan', 'opcDate'],
@@ -81,17 +82,17 @@ function classify(row, ctx) {
   return p ? { status: 'name-match', patient: p } : { status: 'new-nomrn' };
 }
 
-const STATUS_LABEL = {
-  match: ['green', 'مريض موجود'],
-  upgrade: ['blue', 'موجود — سيُكمَّل اسمه'],
-  'name-match': ['amber', 'مطابق بالاسم فقط'],
-  conflict: ['red', 'نفس الرقم باسم مختلف'],
-  new: ['', 'مريض جديد'],
-  'new-nomrn': ['amber', 'جديد بدون رقم ملف'],
-  exists: ['', 'موجود في القائمة — سيُتخطّى'],
-  dup: ['', 'مكرر في الملف — سيُتخطّى'],
-  excluded: ['', 'طبيب مستثنى'],
-};
+const STATUS_LABEL = () => ({
+  match: ['green', tr('مريض موجود', 'Existing patient')],
+  upgrade: ['blue', tr('موجود — سيُكمَّل اسمه', 'Existing — name will be completed')],
+  'name-match': ['amber', tr('مطابق بالاسم فقط', 'Matched by name only')],
+  conflict: ['red', tr('نفس الرقم باسم مختلف', 'Same number, different name')],
+  new: ['', tr('مريض جديد', 'New patient')],
+  'new-nomrn': ['amber', tr('جديد بدون رقم ملف', 'New, no file number')],
+  exists: ['', tr('موجود في القائمة — سيُتخطّى', 'Already on the list — skipped')],
+  dup: ['', tr('مكرر في الملف — سيُتخطّى', 'Repeated in file — skipped')],
+  excluded: ['', tr('طبيب مستثنى', 'Doctor excluded')],
+});
 
 export async function openImport(target = 'clinic', date = todayISO()) {
   let XLSX;
@@ -99,21 +100,21 @@ export async function openImport(target = 'clinic', date = todayISO()) {
   pickFile = null;
 
   const pick = await modal({
-    title: 'استيراد من Excel',
+    title: tr('استيراد من Excel', 'Import from Excel'),
     body: html`
       <div class="grid-2">
-        <label class="field"><span>الوجهة</span><select name="target">
-          <option value="clinic" ${target === 'clinic' ? 'selected' : ''}>حجوزات ما بعد العيادة</option>
-          <option value="committee" ${target === 'committee' ? 'selected' : ''}>لجنة الحالات الجديدة</option></select></label>
-        <label class="field"><span>تاريخ الجلسة</span><input type="date" name="date" value="${date}"></label>
+        <label class="field"><span>${tr('الوجهة', 'Import into')}</span><select name="target">
+          <option value="clinic" ${target === 'clinic' ? 'selected' : ''}>${tr('حجوزات ما بعد العيادة', 'Post-clinic bookings')}</option>
+          <option value="committee" ${target === 'committee' ? 'selected' : ''}>${tr('لجنة الحالات الجديدة', 'New cases committee')}</option></select></label>
+        <label class="field"><span>${tr('تاريخ الجلسة', 'Session date')}</span><input type="date" name="date" value="${date}"></label>
       </div>
-      <label class="field"><span>الملف</span><input type="file" name="file" accept=".xlsx,.xls,.csv" class="input"></label>`,
-    primary: 'التالي',
+      <label class="field"><span>${tr('الملف', 'File')}</span><input type="file" name="file" accept=".xlsx,.xls,.csv" class="input"></label>`,
+    primary: tr('التالي', 'Next'),
     onMount: (dlg) => {
       const f = dlg.querySelector('[name=file]');
       f.addEventListener('change', () => { pickFile = f.files[0] || null; });
     },
-    validate: (d) => (!pickFile ? 'اختر ملف Excel.' : !d.date ? 'اختر تاريخ الجلسة.' : null),
+    validate: (d) => (!pickFile ? tr('اختر ملف Excel.', 'Choose an Excel file.') : !d.date ? tr('اختر تاريخ الجلسة.', 'Choose the session date.') : null),
   });
   const file = pickFile; pickFile = null;
   if (!pick || !file) return;
@@ -124,9 +125,9 @@ export async function openImport(target = 'clinic', date = todayISO()) {
     const ws = wb.Sheets[wb.SheetNames[0]];
     rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
   } catch (e) {
-    toast('تعذّرت قراءة الملف: ' + e.message, { type: 'error' }); return;
+    toast(tr('تعذّرت قراءة الملف: ', 'Could not read the file: ') + e.message, { type: 'error' }); return;
   }
-  if (!rows.length) { toast('الملف فارغ.', { type: 'error' }); return; }
+  if (!rows.length) { toast(tr('الملف فارغ.', 'The file is empty.'), { type: 'error' }); return; }
   await reviewStep({ rows, target: pick.target, date: pick.date, fileName: file.name });
 }
 let pickFile = null;
@@ -158,7 +159,7 @@ async function reviewStep({ rows, target, date, fileName }) {
       const key = row.mrn || normName(row.name);
       if (seen.has(key)) return { ...row, status: 'dup' };
       seen.add(key);
-      if (excluded.has(row.physician || 'بدون طبيب')) return { ...row, status: 'excluded' };
+      if (excluded.has(row.physician || '-')) return { ...row, status: 'excluded' };
       const c = classify(row, { byMrn, byName });
       if (c.patient && existingIn.has(c.patient.id)) return { ...row, status: 'exists', patient: c.patient };
       return { ...row, ...c };
@@ -167,49 +168,50 @@ async function reviewStep({ rows, target, date, fileName }) {
 
   const doctorsOf = (list) => {
     const m = new Map();
-    for (const r of list) { const d = r.physician || 'بدون طبيب'; m.set(d, (m.get(d) || 0) + 1); }
+    for (const r of list) { const d = r.physician || '-'; m.set(d, (m.get(d) || 0) + 1); }
     return [...m].sort((a, b) => byText(a[0], b[0]));
   };
 
   const mappingHTML = () => fields.map((f) => html`
-    <label class="field"><span>${FIELDS[f].l}${f === 'name' ? ' *' : ''}</span>
-      <select data-map="${f}"><option value="">— لا يوجد —</option>${header.map((h, i) => html`<option value="${i}" ${mapping[f] === i ? 'selected' : ''}>${h || `عمود ${i + 1}`}</option>`)}</select></label>`);
+    <label class="field"><span>${FIELDS[f].l()}${f === 'name' ? ' *' : ''}</span>
+      <select data-map="${f}"><option value="">${tr('— لا يوجد —', '— none —')}</option>${header.map((h, i) => html`<option value="${i}" ${mapping[f] === i ? 'selected' : ''}>${h || `${tr('عمود', 'Column')} ${i + 1}`}</option>`)}</select></label>`);
 
   const previewHTML = (list, conflictPolicy) => {
+    const labels = STATUS_LABEL();
     const count = (s) => list.filter((r) => r.status === s).length;
     const willImport = list.filter((r) => !['exists', 'dup', 'excluded'].includes(r.status) && !(r.status === 'conflict' && conflictPolicy === 'skip')).length;
     return String(html`
       <div class="row small">
-        <span class="chip accent">سيُستورد ${willImport}</span>
-        ${Object.entries(STATUS_LABEL).filter(([s]) => count(s)).map(([s, [c, l]]) => html`<span class="chip ${c}">${l}: ${count(s)}</span>`)}
+        <span class="chip accent">${tr('سيُستورد', 'Will import')} ${willImport}</span>
+        ${Object.entries(labels).filter(([s]) => count(s)).map(([s, [c, l]]) => html`<span class="chip ${c}">${l}: ${count(s)}</span>`)}
       </div>
-      ${count('conflict') ? html`<p class="warn-text">يوجد ${count('conflict')} صف رقم ملفه مسجّل لمريض باسم مختلف. راجعها في الجدول؛ اختر أدناه كيف تُعامَل.</p>` : ''}
+      ${count('conflict') ? html`<p class="warn-text">${tr(`يوجد ${count('conflict')} صف رقم ملفه مسجّل لمريض باسم مختلف. راجعها في الجدول؛ اختر أدناه كيف تُعامَل.`, `${count('conflict')} rows have a file number that belongs to a patient with a different name. Review them in the table and choose below how to handle them.`)}</p>` : ''}
       <div class="preview"><table class="data">
-        <thead><tr><th>الحالة</th><th>الاسم في الملف</th><th>رقم الملف</th><th>الطبيب</th><th>الهاتف</th><th>في النظام</th></tr></thead>
-        <tbody>${list.slice(0, 150).map((r) => { const [c, l] = STATUS_LABEL[r.status]; return html`
-          <tr><td><span class="chip ${c}">${l}</span></td><td>${r.name}${wordCount(r.name) < 3 ? html` <span class="chip outline">اسم مختصر</span>` : ''}</td>
+        <thead><tr><th>${tr('الحالة', 'Status')}</th><th>${tr('الاسم في الملف', 'Name in file')}</th><th>${tr('رقم الملف', 'File no.')}</th><th>${tr('الطبيب', 'Doctor')}</th><th>${tr('الهاتف', 'Phone')}</th><th>${tr('في النظام', 'In the system')}</th></tr></thead>
+        <tbody>${list.slice(0, 150).map((r) => { const [c, l] = labels[r.status]; return html`
+          <tr><td><span class="chip ${c}">${l}</span></td><td>${r.name}${wordCount(r.name) < 3 ? html` <span class="chip outline">${tr('اسم مختصر', 'short name')}</span>` : ''}</td>
           <td class="ltr">${r.mrn || '—'}</td><td>${r.physician || '—'}</td><td class="ltr">${r.phone || '—'}</td>
           <td class="small">${r.patient ? html`${r.patient.name} <span class="mrn">${r.patient.mrn}</span>` : ''}</td></tr>`; })}</tbody>
       </table></div>
-      ${list.length > 150 ? html`<p class="small muted">يُعرض أول 150 صفاً من ${list.length}.</p>` : ''}`);
+      ${list.length > 150 ? html`<p class="small muted">${tr(`يُعرض أول 150 صفاً من ${list.length}.`, `Showing the first 150 of ${list.length} rows.`)}</p>` : ''}`);
   };
 
   let current = build();
   const data = await modal({
-    title: `مراجعة الاستيراد — ${target === 'clinic' ? 'حجوزات العيادة' : 'لجنة الحالات'} ${fmtDate(date, 'med')}`,
+    title: `${tr('مراجعة الاستيراد', 'Review import')} — ${target === 'clinic' ? tr('حجوزات العيادة', 'Post-clinic') : tr('لجنة الحالات', 'Committee')} ${fmtDate(date, 'med')}`,
     size: 'xl',
-    primary: 'استيراد',
+    primary: tr('استيراد', 'Import'),
     body: html`
-      <p class="small muted">الملف: ${fileName} — صف العناوين رقم ${headerIdx + 1}. تأكّد من ربط الأعمدة؛ تتحدّث المعاينة فوراً.</p>
+      <p class="small muted">${tr('الملف', 'File')}: ${fileName} — ${tr('صف العناوين رقم', 'header row')} ${headerIdx + 1}. ${tr('تأكّد من ربط الأعمدة؛ تتحدّث المعاينة فوراً.', 'Check the column matching; the preview updates as you change it.')}</p>
       <div class="grid-3" data-mapping>${mappingHTML()}</div>
-      <div class="field"><span class="field-label">الأطباء في الملف (أزل العلامة لاستثناء طبيب)</span><div class="row" data-docs></div></div>
+      <div class="field"><span class="field-label">${tr('الأطباء في الملف (أزل العلامة لاستثناء طبيب)', 'Doctors in the file (untick to exclude)')}</span><div class="row" data-docs></div></div>
       <div class="grid-2">
-        <label class="check"><input type="checkbox" name="fillMissing" checked> إكمال الهاتف والعمر الناقصين في ملفات المرضى الموجودين</label>
-        <label class="check"><input type="checkbox" name="upgradeNames" checked> استبدال الأسماء المختصرة بالاسم الكامل من الملف</label>
-        <label class="field span-2"><span>صفوف «نفس الرقم باسم مختلف»</span><select name="conflict">
-          <option value="skip">تخطّيها لمراجعتها يدوياً (موصى به)</option>
-          <option value="link">ربطها بالمريض الموجود وإبقاء اسمه</option>
-          <option value="rename">ربطها بالمريض الموجود وتغيير اسمه لاسم الملف</option></select></label>
+        <label class="check"><input type="checkbox" name="fillMissing" checked> ${tr('إكمال الهاتف والعمر الناقصين في ملفات المرضى الموجودين', 'Fill missing phone and age on existing patients')}</label>
+        <label class="check"><input type="checkbox" name="upgradeNames" checked> ${tr('استبدال الأسماء المختصرة بالاسم الكامل من الملف', 'Replace shortened names with the full name from the file')}</label>
+        <label class="field span-2"><span>${tr('صفوف «نفس الرقم باسم مختلف»', 'Rows with the same number but a different name')}</span><select name="conflict">
+          <option value="skip">${tr('تخطّيها لمراجعتها يدوياً (موصى به)', 'Skip them for manual review (recommended)')}</option>
+          <option value="link">${tr('ربطها بالمريض الموجود وإبقاء اسمه', 'Link to the existing patient, keep their name')}</option>
+          <option value="rename">${tr('ربطها بالمريض الموجود وتغيير اسمه لاسم الملف', 'Link to the existing patient, use the name from the file')}</option></select></label>
       </div>
       <div data-preview></div>`,
     onMount: (dlg) => {
@@ -217,7 +219,7 @@ async function reviewStep({ rows, target, date, fileName }) {
       const prev = dlg.querySelector('[data-preview]');
       const excluded = new Set();
       const renderDocs = () => {
-        docsBox.innerHTML = doctorsOf(build()).map(([d, n]) => `<label class="check chip outline" style="padding:4px 10px"><input type="checkbox" data-doc="${esc(d)}" ${excluded.has(d) ? '' : 'checked'}> ${esc(d)} (${n})</label>`).join('');
+        docsBox.innerHTML = doctorsOf(build()).map(([d, n]) => `<label class="check chip outline" style="padding:4px 10px"><input type="checkbox" data-doc="${esc(d)}" ${excluded.has(d) ? '' : 'checked'}> ${esc(d === '-' ? tr('بدون طبيب', 'No doctor') : d)} (${n})</label>`).join('');
       };
       const refresh = () => { current = build(excluded); prev.innerHTML = previewHTML(current, dlg.querySelector('[name=conflict]').value); };
       dlg.querySelector('[name=conflict]').addEventListener('change', refresh);
@@ -229,7 +231,7 @@ async function reviewStep({ rows, target, date, fileName }) {
       docsBox.addEventListener('change', (e) => { const d = e.target.dataset.doc; if (d === undefined) return; e.target.checked ? excluded.delete(d) : excluded.add(d); refresh(); });
       renderDocs(); refresh();
     },
-    validate: () => (mapping.name === undefined ? 'اربط عمود «اسم المريض» أولاً.' : !current.some((r) => !['exists', 'dup', 'excluded'].includes(r.status)) ? 'لا توجد صفوف جديدة للاستيراد.' : null),
+    validate: () => (mapping.name === undefined ? tr('اربط عمود «اسم المريض» أولاً.', 'Match the patient name column first.') : !current.some((r) => !['exists', 'dup', 'excluded'].includes(r.status)) ? tr('لا توجد صفوف جديدة للاستيراد.', 'There are no new rows to import.') : null),
   });
   if (!data) return;
   apply(current, { target, date, fileName, ...data });
@@ -249,7 +251,7 @@ function apply(list, opts) {
         if (opts.fillMissing && r.age && !r.patient.age) patch.age = r.age;
         if ((r.status === 'upgrade' && opts.upgradeNames) || (r.status === 'conflict' && opts.conflict === 'rename')) patch.name = r.name;
         if (r.physician && !r.patient.physician) patch.physician = r.physician;
-        if (Object.keys(patch).length) upsert('patients', { id: pid, ...patch }, { summary: `من ملف الاستيراد ${opts.fileName}` });
+        if (Object.keys(patch).length) upsert('patients', { id: pid, ...patch }, { summary: `${tr('من ملف الاستيراد', 'From import file')} ${opts.fileName}` });
       } else {
         pid = create('patients', { name: r.name, mrn: r.mrn, phone: r.phone, age: r.age, physician: r.physician }, false).id; created++;
       }
@@ -260,7 +262,7 @@ function apply(list, opts) {
       }
       records++;
     }
-    note(`استيراد ${opts.fileName} إلى ${opts.target === 'clinic' ? 'حجوزات العيادة' : 'لجنة الحالات'} ${opts.date}: ${records} سجل، ${created} مريض جديد، ${linked} مريض موجود، ${skipped} متخطّى`);
+    note(tr(`استيراد ${opts.fileName} إلى ${opts.target === 'clinic' ? 'حجوزات العيادة' : 'لجنة الحالات'} ${opts.date}: ${records} سجل، ${created} مريض جديد، ${linked} مريض موجود، ${skipped} متخطّى`, `Imported ${opts.fileName} into ${opts.target === 'clinic' ? 'post-clinic' : 'committee'} ${opts.date}: ${records} records, ${created} new patients, ${linked} existing, ${skipped} skipped`));
   });
-  toast(`استُورد ${records} سجل (${created} مريض جديد، ${linked} موجود)${skipped ? `، وتُخطّي ${skipped}` : ''}`);
+  toast(tr(`استُورد ${records} سجل (${created} مريض جديد، ${linked} موجود)${skipped ? `، وتُخطّي ${skipped}` : ''}`, `Imported ${records} records (${created} new patients, ${linked} existing)${skipped ? `, ${skipped} skipped` : ''}`));
 }

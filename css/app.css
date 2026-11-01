@@ -117,7 +117,7 @@ p { margin: 0; }
 .global-search { position: relative; flex: 1; max-width: 520px; margin-inline-start: auto; display: flex; align-items: center; }
 .global-search > .i { position: absolute; inset-inline-start: 12px; color: var(--ink-3); pointer-events: none; }
 .global-search input {
-  width: 100%; height: 42px; padding: 0 40px 0 14px; border-radius: var(--r);
+  width: 100%; height: 42px; padding-block: 0; padding-inline: 40px 14px; border-radius: var(--r);
   border: 1px solid var(--line); background: var(--surface);
 }
 .results {
@@ -262,7 +262,7 @@ dialog.modal::backdrop { background: rgba(18, 22, 42, .45); backdrop-filter: blu
 .form-error { background: var(--red-soft); color: var(--red); padding: 9px 12px; border-radius: var(--r-s); font-weight: 500; }
 
 /* ---------- toasts ---------- */
-.toasts { position: fixed; bottom: 20px; inset-inline-start: 50%; transform: translateX(50%); display: grid; gap: 8px; z-index: 100; }
+.toasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 100; }
 .toast { display: flex; align-items: center; gap: 14px; background: var(--ink); color: var(--paper); padding: 11px 16px; border-radius: var(--r); box-shadow: var(--shadow-pop); font-weight: 500; min-width: 280px; }
 .toast.error { background: var(--red); color: #fff; }
 .toast button { background: none; border: 0; color: #C9BEFF; font-weight: 700; cursor: pointer; padding: 0; }
@@ -348,7 +348,21 @@ dialog.modal::backdrop { background: rgba(18, 22, 42, .45); backdrop-filter: blu
 .decision h4 { font-size: 13px; color: var(--accent-ink); margin-bottom: 4px; }
 .decision .text { white-space: pre-wrap; }
 .addendum { margin-top: 8px; padding-top: 8px; border-top: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent); font-size: 14px; }
-.case-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.case-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.ready-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 14px; border-radius: 99px;
+  border: 2px solid var(--blue); background: transparent; color: var(--blue); font-weight: 700; font-size: 13.5px; cursor: pointer;
+}
+.ready-btn.on { background: var(--blue); color: var(--paper); }
+.ready-toggle {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; cursor: pointer;
+  border: 2px dashed var(--blue); border-radius: var(--r);
+}
+.ready-toggle input { width: 22px; height: 22px; accent-color: var(--blue); }
+.ready-toggle span { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 16px; color: var(--blue); }
+.ready-toggle small { flex-basis: 100%; color: var(--ink-3); }
+.ready-toggle:has(input:checked) { background: var(--blue-soft); border-style: solid; }
+.lang-btn { font-weight: 700; min-width: 44px; }
 
 /* ---------- follow-ups ---------- */
 .fu-group { margin-bottom: 22px; }
@@ -411,6 +425,7 @@ dialog.modal::backdrop { background: rgba(18, 22, 42, .45); backdrop-filter: blu
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }
   .rail { position: fixed; inset-block: 0; inset-inline-start: 0; width: 264px; z-index: 70; transform: translateX(100%); visibility: hidden; transition: transform .2s, visibility .2s; }
+  [dir="ltr"] .rail { transform: translateX(-100%); }
   body.rail-open .rail { transform: none; visibility: visible; }
   .rail-toggle { display: inline-grid; }
   .topbar { padding: 10px 16px; gap: 10px; flex-wrap: wrap; }

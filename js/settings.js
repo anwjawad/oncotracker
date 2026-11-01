@@ -1,8 +1,13 @@
 // Per-device preferences (not clinical data).
 const KEY = 'onco.v2.settings';
 
+// The department's Apps Script deployment. Redeploying with
+// "Manage deployments → Edit → New version" keeps this URL unchanged.
+export const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwSNo0whdJGYjDDcIKsq-MVVIKeG6w47E1sDnIJkE6iQmHFIq-afFuVlikwqSG6OTWxJA/exec';
+
 const DEFAULTS = {
-  apiUrl: '',
+  apiUrl: '',           // empty = DEFAULT_API_URL
+  localMode: false,     // true = demo data on this device only, no server
   userName: '',
   hospital: '',
   department: 'قسم الأورام',

@@ -60,9 +60,18 @@ function renderChrome() {
   const n = idx().lists.committee.filter((c) => c.sessionDate === nextDate).length;
   $('[data-count=committee]').textContent = n || '';
   $('#brand-sub').textContent = settings.get('department') || 'قسم الأورام';
+  renderBanner();
+}
+
+function renderBanner() {
   const banner = $('#mode-banner');
-  banner.hidden = api.mode() === 'remote';
-  if (!banner.hidden) banner.innerHTML = 'وضع تجريبي: البيانات محفوظة على هذا الجهاز فقط. <a href="#/settings">اربط التطبيق بملف Google Sheets</a> لمشاركتها مع الفريق.';
+  if (api.mode() === 'local') {
+    banner.innerHTML = 'وضع تجريبي: البيانات محفوظة على هذا الجهاز فقط ولا تصل للفريق. <a href="#/settings">إيقافه من الإعدادات</a>.';
+    banner.hidden = false;
+  } else if (store.status.oldBackend) {
+    banner.innerHTML = 'التطبيق متصل بملف Google Sheets، لكن خادم Apps Script ما زال على النسخة القديمة، فلا تُحفظ التعديلات بعد. انشر ملف <b>backend/Code.gs</b> الجديد (الخطوات في README)، وإلى ذلك الحين استخدم <a href="backup/">النسخة القديمة</a>.';
+    banner.hidden = false;
+  } else banner.hidden = true;
 }
 
 function renderStatus() {
@@ -75,6 +84,7 @@ function renderStatus() {
   pill.dataset.state = s.state;
   pill.querySelector('.label').textContent = api.mode() === 'local' && s.state === 'saved' ? 'محفوظ على هذا الجهاز' : labels[s.state] || '';
   pill.title = s.error || 'مزامنة الآن';
+  renderBanner();
 }
 
 const scheduleRender = debounce(render, 30);

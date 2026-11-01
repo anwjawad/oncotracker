@@ -1,6 +1,6 @@
 // Settings: connection to the Google Sheet, coordinator name, print header, migration, backup.
 import { html, todayISO, readFileAs } from '../util.js';
-import { settings } from '../settings.js';
+import { settings, DEFAULT_API_URL } from '../settings.js';
 import { api, resetLocal } from '../api.js';
 import { store, sync, clearCache, pendingCount } from '../store.js';
 import { icon, toast, confirmBox } from '../ui.js';
@@ -18,11 +18,12 @@ export function render() {
     <form class="stack" style="max-width:860px" data-settings-form>
       <section class="panel">
         <div class="panel-head"><h2>الاتصال بقاعدة البيانات</h2>
-          <span class="chip ${remote ? 'green' : 'amber'}">${remote ? 'متصل بـ Google Sheets' : 'وضع تجريبي على هذا الجهاز فقط'}</span></div>
+          <span class="chip ${!remote ? 'amber' : store.status.oldBackend ? 'red' : 'green'}">${!remote ? 'وضع تجريبي على هذا الجهاز فقط' : store.status.oldBackend ? 'الخادم على النسخة القديمة' : 'متصل بـ Google Sheets'}</span></div>
         <div class="panel-body stack">
-          <label class="field"><span>رابط تطبيق Google Apps Script (Web App)</span>
-            <input name="apiUrl" class="ltr" value="${s.apiUrl}" placeholder="https://script.google.com/macros/s/…/exec">
-            <span class="hint">انسخه من Deploy ← Manage deployments بعد نشر ملف backend/Code.gs. اتركه فارغاً لتجربة التطبيق محلياً.</span></label>
+          <label class="field"><span>رابط Google Apps Script</span>
+            <input name="apiUrl" class="ltr" value="${s.apiUrl || DEFAULT_API_URL}">
+            <span class="hint">الرابط مدمج في التطبيق ولا يحتاج أحد أن يكتبه. غيّره فقط إذا أنشأت نشراً جديداً (New deployment) برابط مختلف؛ تفريغ الحقل يعيد الرابط المدمج.</span></label>
+          <label class="check"><input type="checkbox" name="localMode" ${s.localMode ? 'checked' : ''}> وضع تجريبي: بيانات وهمية على هذا الجهاز فقط، بدون اتصال بالخادم</label>
           <div class="row">
             <button type="button" class="btn" data-action="st-test">اختبار الاتصال</button>
             ${remote ? html`<button type="button" class="btn" data-action="st-migrate">${icon('upload')} ترحيل بيانات النسخة القديمة</button>` : ''}
@@ -81,17 +82,18 @@ export function mount(root) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = new FormData(form);
-    const before = settings.get('apiUrl');
+    const before = { apiUrl: settings.get('apiUrl'), localMode: settings.get('localMode') };
+    const url = String(f.get('apiUrl') || '').trim();
     const patch = {
-      apiUrl: String(f.get('apiUrl') || '').trim(), userName: String(f.get('userName') || '').trim(),
+      apiUrl: url === DEFAULT_API_URL ? '' : url, localMode: f.get('localMode') === 'on', userName: String(f.get('userName') || '').trim(),
       committeeDay: Number(f.get('committeeDay')), followupDays: Number(f.get('followupDays') || 3), theme: f.get('theme'),
       hospital: String(f.get('hospital') || '').trim(), department: String(f.get('department') || '').trim(),
     };
     if (patch.apiUrl && !/^https:\/\/script\.google(usercontent)?\.com\//.test(patch.apiUrl)) { toast('الرابط يجب أن يبدأ بـ https://script.google.com/', { type: 'error' }); return; }
     settings.set(patch);
     toast('حُفظت الإعدادات');
-    if (before !== patch.apiUrl) {
-      if (pendingCount() && !(await confirmBox(`توجد ${pendingCount()} تعديلات لم تُرسل بعد إلى المصدر السابق وستُفقد. متابعة؟`, { danger: true }))) { settings.set({ apiUrl: before }); return; }
+    if (before.apiUrl !== patch.apiUrl || before.localMode !== patch.localMode) {
+      if (pendingCount() && !(await confirmBox(`توجد ${pendingCount()} تعديلات لم تُرسل بعد إلى المصدر السابق وستُفقد. متابعة؟`, { danger: true }))) { settings.set(before); return; }
       clearCache();
       sync().catch((err) => toast('تعذّر الاتصال: ' + err.message, { type: 'error' }));
     }

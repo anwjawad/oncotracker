@@ -5,9 +5,9 @@
  * 1) افتح ملف Google Sheets الحالي ← Extensions ← Apps Script.
  * 2) استبدل محتوى Code.gs بهذا الملف واحفظ.
  * 3) اختر الدالة setup من القائمة واضغط Run (ووافق على الصلاحيات).
- * 4) Deploy ← New deployment ← Web app: Execute as = Me، Who has access = Anyone.
- *    (إذا كان عندك نشر سابق: Manage deployments ← Edit ← Version: New version، فيبقى نفس الرابط.)
- * 5) الصق الرابط في صفحة الإعدادات داخل التطبيق، ثم اضغط «ترحيل بيانات النسخة القديمة».
+ * 4) Deploy ← Manage deployments ← (القلم) Edit ← Version: New version ← Deploy.
+ *    مهم: لا تستخدم New deployment، لأنه يعطي رابطاً جديداً، والتطبيق مدمج فيه الرابط الحالي.
+ * 5) افتح التطبيق ← الإعدادات ← «ترحيل بيانات النسخة القديمة».
  *
  * الأوراق القديمة (PostClinicBookings, NewCasesMeeting, ...) لا تُعدَّل ولا تُحذف.
  */

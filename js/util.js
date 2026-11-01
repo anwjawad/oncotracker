@@ -1,4 +1,5 @@
 // Small shared helpers: safe HTML templating, Arabic-aware normalisation, dates.
+import { lang, tr } from './i18n.js';
 
 // ---------- HTML ----------
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -98,22 +99,29 @@ export function nextWeekday(day, from = todayISO()) {
   return from;
 }
 
-const F_LONG = new Intl.DateTimeFormat('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const F_MED = new Intl.DateTimeFormat('ar-u-nu-latn', { weekday: 'short', day: 'numeric', month: 'short' });
-const F_SHORT = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'short' });
-const F_MONTH = new Intl.DateTimeFormat('ar-u-nu-latn', { month: 'long', year: 'numeric' });
-const F_TIME = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const FORMATS = {
+  long: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' },
+  med: { weekday: 'short', day: 'numeric', month: 'short' },
+  short: { day: 'numeric', month: 'short' },
+  month: { month: 'long', year: 'numeric' },
+  time: { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' },
+};
+const fmtCache = {};
+function F(kind) {
+  const key = lang() + kind;
+  fmtCache[key] ||= new Intl.DateTimeFormat(lang() === 'en' ? 'en-GB' : 'ar-u-nu-latn', FORMATS[kind]);
+  return fmtCache[key];
+}
 
 export function fmtDate(s, style = 'short') {
   if (!isISODate(s)) return s || '';
-  const f = style === 'long' ? F_LONG : style === 'med' ? F_MED : F_SHORT;
-  return f.format(parseISO(s));
+  return F(style === 'long' ? 'long' : style === 'med' ? 'med' : 'short').format(parseISO(s));
 }
-export const fmtMonth = (key) => (key ? F_MONTH.format(parseISO(key + '-01')) : '');
+export const fmtMonth = (key) => (key ? F('month').format(parseISO(key + '-01')) : '');
 export function fmtTime(isoTs) {
   if (!isoTs) return '';
   const d = new Date(isoTs);
-  return isNaN(d) ? '' : F_TIME.format(d);
+  return isNaN(d) ? '' : F('time').format(d);
 }
 
 export function plural(n, one, two, few, many) {
@@ -122,15 +130,20 @@ export function plural(n, one, two, few, many) {
   if (n >= 3 && n <= 10) return `${n} ${few}`;
   return `${n} ${many}`;
 }
-export const daysText = (n) => plural(n, 'يوم واحد', 'يومين', 'أيام', 'يوماً');
+// count(5, ['حالة واحدة', 'حالتان', 'حالات', 'حالة'], ['case', 'cases'])
+export function count(n, ar, en) {
+  if (lang() === 'en') return `${n} ${n === 1 ? en[0] : en[1]}`;
+  return plural(n, ...ar);
+}
+export const daysText = (n) => count(n, ['يوم واحد', 'يومين', 'أيام', 'يوماً'], ['day', 'days']);
 
 export function relDay(s) {
   if (!isISODate(s)) return '';
   const n = diffDays(todayISO(), s);
-  if (n === 0) return 'اليوم';
-  if (n === 1) return 'غداً';
-  if (n === -1) return 'أمس';
-  return n < 0 ? `قبل ${daysText(-n)}` : `بعد ${daysText(n)}`;
+  if (n === 0) return tr('اليوم', 'Today');
+  if (n === 1) return tr('غداً', 'Tomorrow');
+  if (n === -1) return tr('أمس', 'Yesterday');
+  return n < 0 ? tr(`قبل ${daysText(-n)}`, `${daysText(-n)} ago`) : tr(`بعد ${daysText(n)}`, `in ${daysText(n)}`);
 }
 
 // ---------- misc ----------
@@ -167,7 +180,7 @@ export function loadXLSX() {
     const s = document.createElement('script');
     s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
     s.onload = () => resolve(window.XLSX);
-    s.onerror = () => { xlsxPromise = null; reject(new Error('تعذّر تحميل مكتبة Excel. تحقّق من الاتصال بالإنترنت.')); };
+    s.onerror = () => { xlsxPromise = null; reject(new Error(tr('تعذّر تحميل مكتبة Excel. تحقّق من الاتصال بالإنترنت.', 'Could not load the Excel library. Check your internet connection.'))); };
     document.head.append(s);
   });
   return xlsxPromise;

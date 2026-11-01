@@ -4,10 +4,11 @@ import { idx, patient } from '../store.js';
 import { FU_TYPES, fuLabel, CASE_STATUS, openTasks } from '../rules.js';
 import { icon, toast } from '../ui.js';
 import { registerActions, registerChanges, ui } from '../registry.js';
+import { tr, dr } from '../i18n.js';
 
-export const title = 'التقارير';
+export const title = () => tr('التقارير', 'Reports');
 
-const RANGES = { '1m': ['آخر 30 يوماً', 30], '3m': ['آخر 3 أشهر', 91], '12m': ['آخر 12 شهراً', 365], all: ['كل الفترات', 100000] };
+const RANGES = () => ({ '1m': [tr('آخر 30 يوماً', 'Last 30 days'), 30], '3m': [tr('آخر 3 أشهر', 'Last 3 months'), 91], '12m': [tr('آخر 12 شهراً', 'Last 12 months'), 365], all: [tr('كل الفترات', 'All time'), 100000] });
 
 function bars(items) {
   const max = Math.max(1, ...items.map((i) => i.n));
@@ -16,7 +17,8 @@ function bars(items) {
 }
 
 export function render() {
-  const [label, days] = RANGES[ui.reportsRange];
+  const ranges = RANGES();
+  const [, days] = ranges[ui.reportsRange];
   const from = addDays(todayISO(), -days);
   const { lists } = idx();
   const inRange = (d) => d && d >= from;
@@ -36,56 +38,56 @@ export function render() {
 
   const docs = new Map();
   const doc = (d) => { if (!docs.has(d)) docs.set(d, { visits: 0, notified: 0, cases: 0, decided: 0 }); return docs.get(d); };
-  for (const v of visits) { const r = doc(v.physician || 'بدون طبيب'); r.visits++; if (v.notified === 'Y') r.notified++; }
-  for (const c of cases) { const r = doc(c.physician || 'بدون طبيب'); r.cases++; if (c.status === 'presented') r.decided++; }
+  for (const v of visits) { const r = doc(v.physician || ''); r.visits++; if (v.notified === 'Y') r.notified++; }
+  for (const c of cases) { const r = doc(c.physician || ''); r.cases++; if (c.status === 'presented') r.decided++; }
 
   const byType = FU_TYPES.map((t) => ({ l: t.l, n: fuOpened.filter((f) => f.type === t.v).length })).filter((x) => x.n);
-  const caseStatus = Object.entries(CASE_STATUS).map(([k, s]) => ({ l: s.l, n: cases.filter((c) => (c.status || 'listed') === k).length })).filter((x) => x.n);
+  const caseStatus = Object.entries(CASE_STATUS).filter(([k]) => k !== 'ready').map(([k, s]) => ({ l: s.l, n: cases.filter((c) => (c.status || 'listed') === k).length })).filter((x) => x.n);
 
   return html`
     <div class="toolbar">
-      <select class="input" style="width:auto" data-change="rp-range" aria-label="الفترة">
-        ${Object.entries(RANGES).map(([k, [l]]) => html`<option value="${k}" ${ui.reportsRange === k ? 'selected' : ''}>${l}</option>`)}
+      <select class="input" style="width:auto" data-change="rp-range" aria-label="${tr('الفترة', 'Period')}">
+        ${Object.entries(ranges).map(([k, [l]]) => html`<option value="${k}" ${ui.reportsRange === k ? 'selected' : ''}>${l}</option>`)}
       </select>
-      <span class="muted small">${ui.reportsRange === 'all' ? '' : `من ${fmtDate(from, 'med')} حتى اليوم`}</span>
+      <span class="muted small">${ui.reportsRange === 'all' ? '' : tr(`من ${fmtDate(from, 'med')} حتى اليوم`, `From ${fmtDate(from, 'med')} to today`)}</span>
       <span class="spacer"></span>
-      <button class="btn" data-action="rp-export">${icon('download')} تصدير كل البيانات إلى Excel</button>
+      <button class="btn" data-action="rp-export">${icon('download')} ${tr('تصدير كل البيانات إلى Excel', 'Export all data to Excel')}</button>
     </div>
 
     <div class="kpis">
-      <div class="kpi"><b>${visits.length}</b><span>زيارات عيادة</span></div>
-      <div class="kpi"><b>${notifiedPct}%</b><span>نسبة التبليغ</span></div>
-      <div class="kpi"><b>${cases.length}</b><span>حالات على اللجنة</span></div>
-      <div class="kpi"><b>${cases.filter((c) => c.status === 'presented').length}</b><span>قرارات مسجّلة</span></div>
-      <div class="kpi"><b>${fuOpened.length}</b><span>متابعات فُتحت</span></div>
-      <div class="kpi"><b>${fuClosed.length}</b><span>متابعات أُنجزت</span></div>
-      <div class="kpi"><b>${med === null ? '—' : Math.round(med * 10) / 10}</b><span>وسيط أيام الإنجاز</span></div>
-      <div class="kpi"><b style="color:${overdueNow ? 'var(--red)' : 'inherit'}">${overdueNow}</b><span>متأخرة الآن</span></div>
+      <div class="kpi"><b>${visits.length}</b><span>${tr('زيارات عيادة', 'Clinic visits')}</span></div>
+      <div class="kpi"><b>${notifiedPct}%</b><span>${tr('نسبة التبليغ', 'Notified')}</span></div>
+      <div class="kpi"><b>${cases.length}</b><span>${tr('حالات على اللجنة', 'Committee cases')}</span></div>
+      <div class="kpi"><b>${cases.filter((c) => c.status === 'presented').length}</b><span>${tr('قرارات مسجّلة', 'Decisions recorded')}</span></div>
+      <div class="kpi"><b>${fuOpened.length}</b><span>${tr('متابعات فُتحت', 'Follow-ups opened')}</span></div>
+      <div class="kpi"><b>${fuClosed.length}</b><span>${tr('متابعات أُنجزت', 'Follow-ups completed')}</span></div>
+      <div class="kpi"><b>${med === null ? '—' : Math.round(med * 10) / 10}</b><span>${tr('وسيط أيام الإنجاز', 'Median days to complete')}</span></div>
+      <div class="kpi"><b style="color:${overdueNow ? 'var(--red)' : 'inherit'}">${overdueNow}</b><span>${tr('متأخرة الآن', 'Overdue now')}</span></div>
     </div>
 
     <div class="cols-2">
       <section class="panel">
-        <div class="panel-head"><h3>شهرياً</h3><span class="small muted">زيارات / حالات لجنة</span></div>
+        <div class="panel-head"><h3>${tr('شهرياً', 'By month')}</h3><span class="small muted">${tr('زيارات / حالات لجنة', 'visits / committee cases')}</span></div>
         <div class="panel-body">${monthRows.length ? html`<div class="table-wrap"><table class="data">
-          <thead><tr><th>الشهر</th><th>زيارات العيادة</th><th>حالات اللجنة</th></tr></thead>
+          <thead><tr><th>${tr('الشهر', 'Month')}</th><th>${tr('زيارات العيادة', 'Clinic visits')}</th><th>${tr('حالات اللجنة', 'Committee cases')}</th></tr></thead>
           <tbody>${monthRows.map(([k, r]) => html`<tr><td>${fmtMonth(k)}</td><td>${r.v}</td><td>${r.c}</td></tr>`)}</tbody></table></div>`
-          : html`<div class="empty">لا بيانات في هذه الفترة.</div>`}</div>
+          : html`<div class="empty">${tr('لا بيانات في هذه الفترة.', 'No data in this period.')}</div>`}</div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h3>المتابعات حسب النوع</h3></div>
-        <div class="panel-body">${byType.length ? bars(byType) : html`<div class="empty">لا متابعات في هذه الفترة.</div>`}</div>
+        <div class="panel-head"><h3>${tr('المتابعات حسب النوع', 'Follow-ups by type')}</h3></div>
+        <div class="panel-body">${byType.length ? bars(byType) : html`<div class="empty">${tr('لا متابعات في هذه الفترة.', 'No follow-ups in this period.')}</div>`}</div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h3>حسب الطبيب</h3></div>
+        <div class="panel-head"><h3>${tr('حسب الطبيب', 'By doctor')}</h3></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>الطبيب</th><th>زيارات</th><th>تبليغ</th><th>حالات لجنة</th><th>قرارات</th></tr></thead>
+          <thead><tr><th>${tr('الطبيب', 'Doctor')}</th><th>${tr('زيارات', 'Visits')}</th><th>${tr('تبليغ', 'Notified')}</th><th>${tr('حالات لجنة', 'Committee')}</th><th>${tr('قرارات', 'Decisions')}</th></tr></thead>
           <tbody>${[...docs].sort((a, b) => b[1].visits + b[1].cases - (a[1].visits + a[1].cases) || byText(a[0], b[0])).map(([d, r]) => html`
-            <tr><td>${d}</td><td>${r.visits}</td><td>${r.visits ? Math.round((r.notified / r.visits) * 100) + '%' : '—'}</td><td>${r.cases}</td><td>${r.decided}</td></tr>`)}</tbody>
+            <tr><td>${dr(d)}</td><td>${r.visits}</td><td>${r.visits ? Math.round((r.notified / r.visits) * 100) + '%' : '—'}</td><td>${r.cases}</td><td>${r.decided}</td></tr>`)}</tbody>
         </table></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h3>حالات اللجنة حسب النتيجة</h3></div>
-        <div class="panel-body">${caseStatus.length ? bars(caseStatus) : html`<div class="empty">لا حالات في هذه الفترة.</div>`}</div>
+        <div class="panel-head"><h3>${tr('حالات اللجنة حسب النتيجة', 'Committee cases by outcome')}</h3></div>
+        <div class="panel-body">${caseStatus.length ? bars(caseStatus) : html`<div class="empty">${tr('لا حالات في هذه الفترة.', 'No cases in this period.')}</div>`}</div>
       </section>
     </div>`;
 }
@@ -97,10 +99,10 @@ async function exportAll() {
   const P = (id) => patient(id) || {};
   const wb = XLSX.utils.book_new();
   const add = (name, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
-  add('المرضى', lists.patients.map((p) => ({ 'الاسم': p.name, 'رقم الملف': p.mrn, 'الهاتف': p.phone, 'هاتف آخر': p.phone2, 'العمر': p.age, 'الطبيب': p.physician, 'التشخيص': p.diagnosis, 'ملاحظات': p.notes })));
-  add('زيارات العيادة', lists.visits.map((v) => ({ 'التاريخ': v.sessionDate, 'المريض': P(v.patientId).name, 'رقم الملف': P(v.patientId).mrn, 'الطبيب': v.physician, 'الخطة': v.plan, 'الموعد القادم': v.opcDate, 'تصريح': v.permit, 'تحويل': v.referral, 'تبليغ': v.notified })));
-  add('اللجنة', lists.committee.map((c) => ({ 'الجلسة': c.sessionDate, 'المريض': P(c.patientId).name, 'رقم الملف': P(c.patientId).mrn, 'الطبيب': c.physician, 'القصة': c.briefHistory, 'السؤال': c.question, 'الحالة': CASE_STATUS[c.status]?.l || c.status, 'القرار': c.decision, 'الملاحق': (c.addenda || []).map((a) => a.text).join(' | ') })));
-  add('المتابعات', lists.followups.map((f) => ({ 'المريض': P(f.patientId).name, 'رقم الملف': P(f.patientId).mrn, 'النوع': fuLabel(f.type), 'المطلوب': f.title, 'الاستحقاق': f.dueDate, 'الحالة': f.status, 'النتيجة': f.outcome, 'فُتحت': String(f.createdAt).slice(0, 10), 'أُغلقت': String(f.closedAt).slice(0, 10), 'المحاولات': (f.attempts || []).length })));
+  add(tr('المرضى', 'Patients'), lists.patients.map((p) => ({ [tr('الاسم', 'Name')]: p.name, [tr('رقم الملف', 'File no.')]: p.mrn, [tr('الهاتف', 'Phone')]: p.phone, [tr('هاتف آخر', 'Phone 2')]: p.phone2, [tr('العمر', 'Age')]: p.age, [tr('الطبيب', 'Doctor')]: p.physician, [tr('التشخيص', 'Diagnosis')]: p.diagnosis, [tr('ملاحظات', 'Notes')]: p.notes })));
+  add(tr('زيارات العيادة', 'Clinic visits'), lists.visits.map((v) => ({ [tr('التاريخ', 'Date')]: v.sessionDate, [tr('المريض', 'Patient')]: P(v.patientId).name, [tr('رقم الملف', 'File no.')]: P(v.patientId).mrn, [tr('الطبيب', 'Doctor')]: v.physician, [tr('الخطة', 'Plan')]: v.plan, [tr('الموعد القادم', 'Next appointment')]: v.opcDate, [tr('تصريح', 'Permit')]: v.permit, [tr('تحويل', 'Referral')]: v.referral, [tr('تبليغ', 'Notified')]: v.notified })));
+  add(tr('اللجنة', 'Committee'), lists.committee.map((c) => ({ [tr('الجلسة', 'Session')]: c.sessionDate, [tr('المريض', 'Patient')]: P(c.patientId).name, [tr('رقم الملف', 'File no.')]: P(c.patientId).mrn, [tr('الطبيب', 'Doctor')]: c.physician, [tr('القصة', 'History')]: c.briefHistory, [tr('السؤال', 'Question')]: c.question, [tr('جاهز', 'Ready')]: c.ready === '1' ? '✓' : '', [tr('الحالة', 'Status')]: (CASE_STATUS[c.status] || CASE_STATUS.listed).l, [tr('القرار', 'Decision')]: c.decision, [tr('الملاحق', 'Addenda')]: (c.addenda || []).map((a) => a.text).join(' | ') })));
+  add(tr('المتابعات', 'Follow-ups'), lists.followups.map((f) => ({ [tr('المريض', 'Patient')]: P(f.patientId).name, [tr('رقم الملف', 'File no.')]: P(f.patientId).mrn, [tr('النوع', 'Type')]: fuLabel(f.type), [tr('المطلوب', 'Task')]: f.title, [tr('الاستحقاق', 'Due')]: f.dueDate, [tr('الحالة', 'Status')]: f.status, [tr('النتيجة', 'Outcome')]: f.outcome, [tr('فُتحت', 'Opened')]: String(f.createdAt).slice(0, 10), [tr('أُغلقت', 'Closed')]: String(f.closedAt).slice(0, 10), [tr('المحاولات', 'Attempts')]: (f.attempts || []).length })));
   XLSX.writeFile(wb, `onco-tracker-${todayISO()}.xlsx`);
 }
 

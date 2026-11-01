@@ -6,7 +6,7 @@ import { settings } from './settings.js';
 const FIRST = ['محمد', 'أحمد', 'خالد', 'سامي', 'يوسف', 'إبراهيم', 'عمر', 'فاطمة', 'مريم', 'سعاد', 'هدى', 'نور', 'ليلى', 'رنا', 'منى', 'عبد الله', 'حسن', 'سلمى', 'آمنة', 'زينب'];
 const MID = ['علي', 'محمود', 'سليم', 'جميل', 'عادل', 'فؤاد', 'ناصر', 'كمال', 'رشيد', 'وليد'];
 const LAST = ['الخطيب', 'النجار', 'الحسيني', 'العمري', 'البرغوثي', 'الشريف', 'القاسم', 'الزعبي', 'حمدان', 'عيسى', 'منصور', 'سلامة'];
-const DOCS = ['سامر حداد', 'ريم عودة', 'ماهر شاهين', 'لينا خوري'];
+const DOCS = ['Wasim', 'Bashir', 'Farah', 'Hanna', 'Amer'];
 const PLANS = [
   'Continue FOLFOX cycle 4, CBC before next cycle',
   'CT chest/abdomen/pelvis then OPC with results',

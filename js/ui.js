@@ -1,7 +1,9 @@
-// UI building blocks: icons, dialogs, toasts, menus and the patient picker.
-import { html, raw, esc, $, $$, normMrn, normName, cleanName, matchesQuery, relDay, todayISO, diffDays, phoneDigits } from './util.js';
+// UI building blocks: icons, dialogs, toasts, menus, the doctor field and the patient picker.
+import { html, raw, esc, $, $$, normMrn, normName, cleanName, cleanPhysician, matchesQuery, relDay, todayISO, diffDays, daysText, phoneDigits } from './util.js';
 import { idx, create, upsert } from './store.js';
 import { fixPhone } from './rules.js';
+import { settings, DEFAULT_PHYSICIANS } from './settings.js';
+import { tr } from './i18n.js';
 
 const ICONS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
@@ -30,11 +32,15 @@ const ICONS = {
 };
 export const icon = (name, size = 18) => raw(`<svg class="i" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`);
 
+// Previous / next arrows that point the right way in both reading directions.
+export const prevIcon = () => icon(document.documentElement.dir === 'ltr' ? 'chevL' : 'chevR');
+export const nextIcon = () => icon(document.documentElement.dir === 'ltr' ? 'chevR' : 'chevL');
+
 // ---------- toasts ----------
 export function toast(message, { type = 'ok', undo, timeout = 5000 } = {}) {
   const el = document.createElement('div');
   el.className = `toast ${type === 'error' ? 'error' : ''}`;
-  el.innerHTML = `<span>${esc(message)}</span>${undo ? '<button type="button">تراجع</button>' : ''}`;
+  el.innerHTML = `<span>${esc(message)}</span>${undo ? `<button type="button">${esc(tr('تراجع', 'Undo'))}</button>` : ''}`;
   const kill = () => el.remove();
   if (undo) el.querySelector('button').onclick = () => { undo(); kill(); };
   $('#toasts').append(el);
@@ -57,13 +63,15 @@ function formData(form) {
 
 // Resolves with the form's values, or null when cancelled.
 // validate(data, form) may return an error string to keep the dialog open.
-export function modal({ title, body, primary = 'حفظ', secondary = 'إلغاء', danger = false, size = 'm', onMount, validate }) {
+export function modal({ title, body, primary, secondary, danger = false, size = 'm', onMount, validate }) {
+  primary = primary === undefined ? tr('حفظ', 'Save') : primary;
+  secondary = secondary === undefined ? tr('إلغاء', 'Cancel') : secondary;
   return new Promise((resolve) => {
     const dlg = document.createElement('dialog');
     dlg.className = `modal modal-${size}`;
     dlg.innerHTML = `
       <form class="modal-form" novalidate>
-        <header><h2>${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="إغلاق">${icon('x')}</button></header>
+        <header><h2>${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="${esc(tr('إغلاق', 'Close'))}">${icon('x')}</button></header>
         <div class="modal-body"><div class="form-error" hidden></div>${String(body)}</div>
         <footer>
           ${primary ? `<button type="submit" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${esc(primary)}</button>` : ''}
@@ -95,8 +103,8 @@ export function modal({ title, body, primary = 'حفظ', secondary = 'إلغاء
   });
 }
 
-export async function confirmBox(message, { title = 'تأكيد', confirm = 'متابعة', danger = false } = {}) {
-  const r = await modal({ title, body: html`<p>${message}</p>`, primary: confirm, danger });
+export async function confirmBox(message, { title, confirm, danger = false } = {}) {
+  const r = await modal({ title: title || tr('تأكيد', 'Confirm'), body: html`<p>${message}</p>`, primary: confirm || tr('متابعة', 'Continue'), danger });
   return r !== null;
 }
 
@@ -110,53 +118,92 @@ export function toggleMenu(btn) {
 }
 export const menu = (items) => html`
   <div class="menu-wrap">
-    <button type="button" class="icon-btn" data-action="menu" aria-label="المزيد">${icon('more')}</button>
+    <button type="button" class="icon-btn" data-action="menu" aria-label="${tr('المزيد', 'More')}">${icon('more')}</button>
     <div class="menu" hidden>${items}</div>
   </div>`;
 
 // ---------- small renderers ----------
 export function dueChip(due, status) {
-  if (!due) return html`<span class="task-due muted">بدون تاريخ</span>`;
+  if (!due) return html`<span class="task-due muted">${tr('بدون تاريخ', 'No date')}</span>`;
   const n = diffDays(todayISO(), due);
   const cls = n < 0 ? 'over' : n === 0 ? 'today' : '';
-  const label = n < 0 ? `متأخرة ${relDay(due).replace('قبل ', '')}` : relDay(due);
-  return html`<span class="task-due ${cls}">${n < 0 ? icon('alert', 14) : icon('clock', 14)} ${label}${status === 'waiting' ? ' · بانتظار رد' : ''}</span>`;
+  const label = n < 0 ? tr(`متأخرة ${daysText(-n)}`, `${daysText(-n)} overdue`) : relDay(due);
+  return html`<span class="task-due ${cls}">${n < 0 ? icon('alert', 14) : icon('clock', 14)} ${label}${status === 'waiting' ? tr(' · بانتظار رد', ' · waiting') : ''}</span>`;
 }
 
-export const physicianOptions = (id = 'physician-list') => html`<datalist id="${id}">${idx().physicians.map((p) => html`<option value="${p}">`)}</datalist>`;
-
 export const telLink = (phone) => phone ? html`<a class="ltr" href="tel:${phoneDigits(phone)}">${phone}</a>` : html`<span class="muted">—</span>`;
+
+// ---------- doctor field ----------
+// A dropdown of the department's doctors plus "Other" with free text.
+// Defaults to the doctor used for the previous patient, to speed up entry.
+export function physicianList() {
+  const list = settings.get('physicians');
+  return Array.isArray(list) && list.length ? list : DEFAULT_PHYSICIANS;
+}
+
+export function physicianFieldHTML({ value, label, name = 'physician' } = {}) {
+  const list = physicianList();
+  const v = value === undefined ? settings.get('lastPhysician') || '' : cleanPhysician(value);
+  const known = list.find((d) => d.toLowerCase() === v.toLowerCase());
+  const other = v && !known;
+  return html`
+    <div class="field" data-physician-field>
+      <span>${label || tr('الطبيب', 'Doctor')}</span>
+      <select name="${name}">
+        <option value="" ${!v ? 'selected' : ''}>${tr('اختر الطبيب…', 'Choose doctor…')}</option>
+        ${list.map((d) => html`<option value="${d}" ${known === d ? 'selected' : ''}>Dr. ${d}</option>`)}
+        <option value="__other" ${other ? 'selected' : ''}>${tr('آخر (اكتب الاسم)', 'Other (type name)')}</option>
+      </select>
+      <input name="${name}Other" placeholder="${tr('اسم الطبيب', 'Doctor name')}" value="${other ? v : ''}" ${other ? '' : 'hidden'}>
+    </div>`;
+}
+
+export function mountPhysicianField(root) {
+  for (const box of $$('[data-physician-field]', root)) {
+    const sel = $('select', box);
+    const other = $('input', box);
+    sel.addEventListener('change', () => { other.hidden = sel.value !== '__other'; if (!other.hidden) other.focus(); });
+  }
+}
+
+// Reads the doctor from form data and remembers it as the default for next time.
+export function readPhysician(data, name = 'physician') {
+  const v = data[name] === '__other' ? data[name + 'Other'] : data[name];
+  const doc = cleanPhysician(v || '');
+  if (doc) settings.set({ lastPhysician: doc });
+  return doc;
+}
 
 // ---------- patient picker ----------
 // Renders search-or-create fields inside a dialog form. Fields produced:
 // patientId (existing) or newName/newMrn/newPhone (new patient).
-export function patientPickerHTML({ label = 'المريض', patientId = '' } = {}) {
+export function patientPickerHTML({ label, patientId = '' } = {}) {
   return html`
     <div class="picker field" data-picker>
-      <span>${label}</span>
+      <span>${label || tr('المريض', 'Patient')}</span>
       <input type="hidden" name="patientId" value="${patientId}">
       <div class="picked" ${patientId ? '' : 'hidden'}></div>
       <div class="pick-search" ${patientId ? 'hidden' : ''}>
-        <input class="input" type="search" data-pick-q placeholder="اكتب الاسم أو رقم الملف…" autocomplete="off">
+        <input class="input" type="search" data-pick-q placeholder="${tr('اكتب الاسم أو رقم الملف…', 'Type name or file number…')}" autocomplete="off">
         <div class="results" data-pick-results hidden style="position:static; box-shadow:none; margin-top:6px;"></div>
       </div>
       <div class="pick-new stack" hidden>
         <div class="grid-2">
-          <label class="field span-2"><span>الاسم الكامل (رباعي)</span><input name="newName" autocomplete="off"></label>
-          <label class="field"><span>رقم الملف</span><input name="newMrn" class="ltr" autocomplete="off"></label>
-          <label class="field"><span>الهاتف</span><input name="newPhone" class="ltr" inputmode="tel" autocomplete="off"></label>
+          <label class="field span-2"><span>${tr('الاسم الكامل (رباعي)', 'Full name')}</span><input name="newName" autocomplete="off"></label>
+          <label class="field"><span>${tr('رقم الملف', 'File number')}</span><input name="newMrn" class="ltr" autocomplete="off"></label>
+          <label class="field"><span>${tr('الهاتف', 'Phone')}</span><input name="newPhone" class="ltr" inputmode="tel" autocomplete="off"></label>
         </div>
         <div class="warn-text" data-pick-dup hidden></div>
-        <button type="button" class="btn btn-ghost btn-sm" data-pick-cancel-new>رجوع للبحث</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-pick-cancel-new>${tr('رجوع للبحث', 'Back to search')}</button>
       </div>
     </div>`;
 }
 
 function pickedHTML(p) {
   return `<div class="row-between panel" style="padding:10px 12px;">
-    <div><strong>${esc(p.name)}</strong> <span class="mrn">${esc(p.mrn || 'بدون رقم')}</span>
+    <div><strong>${esc(p.name)}</strong> <span class="mrn">${esc(p.mrn || tr('بدون رقم', 'no number'))}</span>
     ${p.phone ? `<span class="muted small ltr" style="margin-inline-start:8px">${esc(p.phone)}</span>` : ''}</div>
-    <button type="button" class="btn btn-ghost btn-sm" data-pick-change>تغيير</button></div>`;
+    <button type="button" class="btn btn-ghost btn-sm" data-pick-change>${esc(tr('تغيير', 'Change'))}</button></div>`;
 }
 
 export function mountPatientPicker(root) {
@@ -185,7 +232,7 @@ export function mountPatientPicker(root) {
     const nm = normMrn(term);
     const found = pts().filter((p) => (nm && normMrn(p.mrn).includes(nm)) || matchesQuery(term, p.name)).slice(0, 8);
     results.innerHTML = found.map((p) => `<button type="button" class="result" data-id="${esc(p.id)}"><span>${esc(p.name)}</span><span class="meta ltr">${esc(p.mrn || '—')}</span></button>`).join('')
-      + `<button type="button" class="result" data-new><span>${icon('plus', 16)} إضافة مريض جديد${term ? `: «${esc(term)}»` : ''}</span></button>`;
+      + `<button type="button" class="result" data-new><span>${icon('plus', 16)} ${esc(tr('إضافة مريض جديد', 'Add new patient'))}${term ? `: «${esc(term)}»` : ''}</span></button>`;
     results.hidden = false;
   };
   q.addEventListener('input', renderResults);
@@ -215,7 +262,8 @@ export function mountPatientPicker(root) {
     const n = normName($('[name=newName]', fresh).value);
     const hit = (m && idx().byMrn.get(m)?.[0]) || (n.split(' ').length >= 3 && pts().find((p) => normName(p.name) === n));
     if (hit) {
-      dup.innerHTML = `${hit.mrn && normMrn(hit.mrn) === m ? 'رقم الملف مسجّل مسبقاً لـ' : 'يوجد مريض بنفس الاسم:'} <strong>${esc(hit.name)}</strong> (${esc(hit.mrn || 'بدون رقم')}) <button type="button" class="btn btn-sm" data-use="${esc(hit.id)}">استخدم هذا المريض</button>`;
+      const sameMrn = hit.mrn && normMrn(hit.mrn) === m;
+      dup.innerHTML = `${esc(sameMrn ? tr('رقم الملف مسجّل مسبقاً لـ', 'This file number already belongs to') : tr('يوجد مريض بنفس الاسم:', 'A patient with this name exists:'))} <strong>${esc(hit.name)}</strong> (${esc(hit.mrn || tr('بدون رقم', 'no number'))}) <button type="button" class="btn btn-sm" data-use="${esc(hit.id)}">${esc(tr('استخدم هذا المريض', 'Use this patient'))}</button>`;
       dup.hidden = false;
     } else dup.hidden = true;
   };
@@ -227,17 +275,17 @@ export function mountPatientPicker(root) {
 export function resolvePatient(data, extra = {}) {
   if (data.patientId) return { id: data.patientId };
   const name = cleanName(data.newName);
-  if (!name) return { error: 'اختر مريضاً موجوداً أو أدخل اسم المريض الجديد.' };
+  if (!name) return { error: tr('اختر مريضاً موجوداً أو أدخل اسم المريض الجديد.', 'Choose an existing patient or enter the new patient\'s name.') };
   const mrn = normMrn(data.newMrn);
   if (mrn) {
     const hit = idx().byMrn.get(mrn)?.[0];
-    if (hit) return { error: `رقم الملف ${mrn} مسجّل لـ ${hit.name}. استخدم المريض الموجود بدل إنشاء ملف جديد.` };
+    if (hit) return { error: tr(`رقم الملف ${mrn} مسجّل لـ ${hit.name}. استخدم المريض الموجود بدل إنشاء ملف جديد.`, `File number ${mrn} belongs to ${hit.name}. Use the existing patient instead of creating a new record.`) };
   }
   const p = create('patients', { name, mrn, phone: data.newPhone ? fixPhone(data.newPhone) : '', ...extra });
   return { id: p.id, created: true };
 }
 
-export const validatePicker = (data) => (!data.patientId && !cleanName(data.newName) ? 'اختر المريض أو أضف مريضاً جديداً.' : null);
+export const validatePicker = (data) => (!data.patientId && !cleanName(data.newName) ? tr('اختر المريض أو أضف مريضاً جديداً.', 'Choose the patient or add a new one.') : null);
 
 // Writes a phone number to a patient record (used by inline cells).
 export function setPatientField(patientId, field, value) {

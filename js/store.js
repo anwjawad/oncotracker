@@ -24,7 +24,7 @@ const SKIP_DIFF = new Set(['updatedAt', 'createdAt', 'id']);
 export const store = {
   data: emptyData(),
   version: 0,
-  status: { state: 'idle', pending: 0, lastSync: null, error: '' },
+  status: { state: 'idle', pending: 0, lastSync: null, error: '', oldBackend: false },
 };
 
 let outbox = [];
@@ -224,7 +224,7 @@ export async function flush() {
     outbox = [...back, ...outbox];
     inflight = [];
     retryDelay = Math.min(retryDelay ? retryDelay * 2 : 3000, 60000);
-    setStatus({ state: navigator.onLine ? 'error' : 'offline', error: e.message });
+    setStatus({ state: navigator.onLine ? 'error' : 'offline', error: e.message, oldBackend: !!e.oldBackend });
     persist();
     scheduleFlush(retryDelay);
   }
@@ -252,10 +252,10 @@ export async function sync() {
       else if (!seen.has(op.row.id)) next.activity.unshift(op.row);
     }
     store.data = next;
-    setStatus({ state: outbox.length ? 'saving' : 'saved', lastSync: nowISO(), error: '' });
+    setStatus({ state: outbox.length ? 'saving' : 'saved', lastSync: nowISO(), error: '', oldBackend: false });
     changed();
   } catch (e) {
-    setStatus({ state: navigator.onLine ? 'error' : 'offline', error: e.message });
+    setStatus({ state: navigator.onLine ? 'error' : 'offline', error: e.message, oldBackend: !!e.oldBackend });
     throw e;
   } finally {
     syncing = false;

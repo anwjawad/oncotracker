@@ -1,12 +1,13 @@
 // Transport. Remote = Google Apps Script web app; local = a browser-only
 // database used for trying the app before connecting the Google Sheet.
-import { settings } from './settings.js';
+import { settings, DEFAULT_API_URL } from './settings.js';
 
 const LOCAL_DB = 'onco.v2.localdb';
 const TABLES = ['patients', 'visits', 'committee', 'followups'];
 
 export const api = {
-  mode() { return settings.get('apiUrl') ? 'remote' : 'local'; },
+  mode() { return settings.get('localMode') ? 'local' : 'remote'; },
+  url() { return settings.get('apiUrl') || DEFAULT_API_URL; },
   call(action, payload = {}) {
     return this.mode() === 'remote' ? remote(action, payload) : local(action, payload);
   },
@@ -17,16 +18,23 @@ async function remote(action, payload) {
   const timer = setTimeout(() => ctrl.abort(), 60000);
   try {
     // text/plain body keeps this a "simple" request, so Apps Script needs no CORS preflight.
-    const res = await fetch(settings.get('apiUrl'), {
+    const res = await fetch(api.url(), {
       method: 'POST',
       body: JSON.stringify({ action, payload }),
       signal: ctrl.signal,
     });
     if (!res.ok) throw new Error(`الخادم ردّ بالرمز ${res.status}`);
     const json = await res.json();
+    if (!json.success && /^Unknown Action/i.test(json.message || '')) {
+      // The v1 backend answers v2 actions with "Unknown Action".
+      const err = new Error('الخادم ما زال على النسخة القديمة: انشر ملف backend/Code.gs الجديد على Apps Script.');
+      err.oldBackend = true;
+      throw err;
+    }
     if (!json.success) throw new Error(json.message || 'خطأ غير معروف من الخادم');
     return json.data;
   } catch (e) {
+    if (e.oldBackend) throw e;
     if (e.name === 'AbortError') throw new Error('انتهت مهلة الاتصال بالخادم');
     if (e instanceof TypeError) throw new Error('تعذّر الوصول للخادم — تحقّق من الإنترنت ومن رابط Apps Script');
     throw e;

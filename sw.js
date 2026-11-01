@@ -1,54 +1,29 @@
-const CACHE_NAME = 'oncology-workflow-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './css/style.css',
-  './js/app.js',
-  './js/api.js',
-  './js/ui.js',
-  './js/workflows.js',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap'
+// Offline shell: network first for app files, cached copy when offline.
+// Data never goes through this cache — it lives in the Google Sheet.
+const CACHE = 'onco-v2-shell-1';
+const SHELL = [
+  './', 'index.html', 'manifest.json', 'css/app.css',
+  'js/main.js', 'js/util.js', 'js/settings.js', 'js/api.js', 'js/store.js', 'js/rules.js', 'js/ui.js', 'js/registry.js',
+  'js/patient.js', 'js/print.js', 'js/importer.js', 'js/demo.js',
+  'js/views/today.js', 'js/views/committee.js', 'js/views/clinic.js', 'js/views/followups.js',
+  'js/views/patients.js', 'js/views/quality.js', 'js/views/reports.js', 'js/views/settings.js',
 ];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
-  );
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
-      );
-    })
-  );
+self.addEventListener('activate', (e) => {
+  // Removes caches left by this and the previous version of the app.
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached response if found
-        if (response) {
-          return response;
-        }
-        
-        // Return standard fetch
-        return fetch(event.request).catch(() => {
-            // Optional: You could return a specific offline page here
-            return new Response("You are currently offline.", { status: 503, statusText: "Service Unavailable" });
-        });
-      })
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return res; })
+      .catch(() => caches.match(e.request).then((r) => r || caches.match('index.html')))
   );
 });

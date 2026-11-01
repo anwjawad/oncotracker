@@ -9,5 +9,5 @@ if %errorlevel% neq 0 (
 )
 start "" cmd /c "timeout /t 2 /nobreak > nul && start http://localhost:8000"
 echo Onco Tracker is running at http://localhost:8000  (Ctrl+C to stop)
-cd /d "%~dp0frontend"
+cd /d "%~dp0"
 python -m http.server 8000

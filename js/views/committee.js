@@ -184,15 +184,18 @@ export function render() {
 }
 
 // ---------- actions ----------
-export async function referToCommittee({ patientId = '', plan = '', physician, sourceVisitId = '', date = '' } = {}) {
+// Cases are always added to today's session: during the meeting doctors name their
+// patients quickly, so there is no date to pick. Moving a case later is done with
+// "Change doctor or date" or "Defer".
+export async function referToCommittee({ patientId = '', plan = '', physician, sourceVisitId = '' } = {}) {
   const docDefault = physician !== undefined ? physician : (ui.committeeDoctor !== 'ALL' && ui.committeeDoctor ? ui.committeeDoctor : undefined);
+  const sessionDate = todayISO();
   const data = await modal({
-    title: tr('إدراج حالة في اللجنة', 'Add case to committee'),
+    title: `${tr('إدراج حالة — جلسة اليوم', 'Add case — today\'s session')} (${fmtDate(sessionDate, 'med')})`,
     size: 'l',
     body: html`
       ${patientPickerHTML({ patientId })}
       <div class="grid-2">
-        <label class="field"><span>${tr('تاريخ الجلسة', 'Session date')}</span><input type="date" name="sessionDate" value="${date || ui.committeeDate || nextSession()}" required></label>
         ${physicianFieldHTML({ value: docDefault, label: tr('الطبيب المعالج', 'Treating doctor') })}
         <label class="field span-2"><span>${tr('القصة المرضية', 'Brief history')}</span><textarea name="briefHistory" placeholder="${tr('التشخيص، الباثولوجي، الصور، العلاجات السابقة…', 'Diagnosis, pathology, imaging, previous treatment…')}"></textarea></label>
         <label class="field span-2"><span>${tr('السؤال المطروح / الخطة المقترحة', 'Question / proposed plan')}</span><textarea name="question">${plan}</textarea></label>
@@ -206,21 +209,18 @@ export async function referToCommittee({ patientId = '', plan = '', physician, s
       const warn = dlg.querySelector('[data-dup-case]');
       const check = () => {
         const pid = dlg.querySelector('[name=patientId]').value;
-        const d = dlg.querySelector('[name=sessionDate]').value;
-        const hit = pid && (idx().committeeBy.get(pid) || []).find((c) => c.sessionDate === d);
+        const hit = pid && (idx().committeeBy.get(pid) || []).find((c) => c.sessionDate === sessionDate);
         warn.hidden = !hit;
-        warn.textContent = hit ? tr('هذا المريض مُدرج مسبقاً في نفس الجلسة.', 'This patient is already on this session\'s agenda.') : '';
+        warn.textContent = hit ? tr('هذا المريض مُدرج مسبقاً في جلسة اليوم.', 'This patient is already on today\'s agenda.') : '';
       };
       dlg.addEventListener('picked', check);
-      dlg.querySelector('[name=sessionDate]').addEventListener('change', check);
       check();
     },
     validate: (d) => {
       const e = validatePicker(d);
       if (e) return e;
-      if (!d.sessionDate) return tr('اختر تاريخ الجلسة.', 'Choose the session date.');
       if (d.physician === '__other' && !d.physicianOther) return tr('اكتب اسم الطبيب.', 'Type the doctor\'s name.');
-      if (d.patientId && (idx().committeeBy.get(d.patientId) || []).some((c) => c.sessionDate === d.sessionDate)) return tr('هذا المريض مُدرج مسبقاً في نفس الجلسة.', 'This patient is already on this session\'s agenda.');
+      if (d.patientId && (idx().committeeBy.get(d.patientId) || []).some((c) => c.sessionDate === sessionDate)) return tr('هذا المريض مُدرج مسبقاً في جلسة اليوم.', 'This patient is already on today\'s agenda.');
       return null;
     },
   });
@@ -229,10 +229,11 @@ export async function referToCommittee({ patientId = '', plan = '', physician, s
   const r = resolvePatient(data, { physician: doc });
   if (r.error) { toast(r.error, { type: 'error' }); return null; }
   const c = create('committee', {
-    patientId: r.id, sessionDate: data.sessionDate, physician: doc, briefHistory: data.briefHistory,
+    patientId: r.id, sessionDate, physician: doc, briefHistory: data.briefHistory,
     question: data.question, plan: '', decision: '', status: 'listed', ready: data.ready ? '1' : '', notes: '', sourceVisitId, carriedFromId: '', deferredToId: '', decidedAt: '',
   });
-  toast(`${tr('أُدرجت الحالة في جلسة', 'Case added to session')} ${fmtDate(data.sessionDate, 'med')}`);
+  ui.committeeDate = sessionDate;
+  toast(tr('أُدرجت الحالة في جلسة اليوم', 'Case added to today\'s session'));
   return c;
 }
 
@@ -361,7 +362,7 @@ registerActions({
   'cm-date': (el) => { ui.committeeDate = el.dataset.v; },
   'cm-doctor': (el) => { ui.committeeDoctor = el.dataset.v; },
   'cm-filter': (el) => { ui.committeeFilter = el.dataset.v; },
-  'cm-add': () => referToCommittee({ date: ui.committeeDate }),
+  'cm-add': () => referToCommittee(),
   'cm-import': () => openImport('committee', ui.committeeDate),
   'cm-print': (el) => print(el.dataset.v),
   'refer-committee': (el) => referToCommittee({ patientId: el.dataset.patient }),

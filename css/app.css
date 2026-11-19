@@ -442,13 +442,24 @@ dialog.modal::backdrop { background: rgba(18, 22, 42, .45); backdrop-filter: blu
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* CDB File: read-only snapshot of the patient's row in the CDB (OncoCoord) Excel tracker */
-.cdb-file details > summary { cursor: pointer; list-style: none; }
-.cdb-file details > summary::-webkit-details-marker { display: none; }
-.cdb-file details:not([open]) > summary { border-bottom: 0; }
-.cdb-file details > summary h3::after { content: ' ▸'; color: var(--ink-3); font-size: 12px; }
-.cdb-file details[open] > summary h3::after { content: ' ▾'; }
-.cdb-grid { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; margin: 0; padding: 8px 18px 14px; font-size: 13px; }
+.cdb-file { border-color: var(--accent); }
+.cdb-file > .panel-head { background: var(--accent-soft); border-radius: var(--r) var(--r) 0 0; }
+.cdb-file > .panel-head h3 { color: var(--accent-ink); }
+.cdb-key-box { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 14px 18px; }
+.cdb-key { background: var(--accent-soft); border: 1px solid var(--accent); border-inline-start-width: 4px; border-radius: 8px; padding: 8px 12px; min-width: 0; }
+.cdb-key.wide { grid-column: 1 / -1; }
+.cdb-key-label { font-size: 11.5px; font-weight: 600; color: var(--accent-ink); direction: ltr; text-align: start; margin-bottom: 3px; }
+.cdb-key-value { font-size: 15px; font-weight: 700; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cdb-key-value.is-empty { color: var(--ink-3); font-weight: 400; }
+.cdb-all-summary { cursor: pointer; list-style: none; padding: 10px 18px; border-top: 1px solid var(--line-2); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.cdb-all-summary::-webkit-details-marker { display: none; }
+.cdb-all-summary::before { content: '▸ '; color: var(--ink-3); }
+details[open] > .cdb-all-summary::before { content: '▾ '; }
+.cdb-grid { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; margin: 0; padding: 0 18px 14px; font-size: 13px; }
 .cdb-grid dt, .cdb-grid dd { margin: 0; padding: 6px 8px; border-bottom: 1px solid var(--line-2); }
 .cdb-grid dt { color: var(--ink-2); font-weight: 600; direction: ltr; text-align: start; }
 .cdb-grid dd { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cdb-grid .is-key { background: var(--accent-soft); }
+.cdb-grid dt.is-key { color: var(--accent-ink); }
+.cdb-grid dd.is-key { font-weight: 600; }
 @media (max-width: 520px) { .cdb-grid { grid-template-columns: 1fr; } .cdb-grid dt { border-bottom: 0; padding-bottom: 0; } }

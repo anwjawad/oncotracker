@@ -129,23 +129,46 @@ export function renderDrawer() {
 
 // Read-only copy of the patient's row in the CDB (OncoCoord) Excel tracker, written by CDB on each
 // Excel upload (only when a column changed). Stored as JSON [[column, value], ...] in `cdbData`.
-// Open/closed state survives the drawer's re-renders.
+// The most important CDB columns are always shown in a highlighted box; the full list is collapsible
+// (its open/closed state survives the drawer's re-renders).
+const CDB_KEY_FIELDS = [
+  { label: 'Patient Name' },
+  { label: 'ID' },
+  { label: 'File Number' },
+  { label: 'Treatment Plan', wide: true },
+  { label: 'Referral forms sent/types', wide: true },
+  { label: 'Treatment Referral Status' },
+  { label: 'chemotherapy Appointment Date' },
+];
+const cdbLabelKey = (s) => String(s ?? '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+const CDB_KEY_SET = new Set(CDB_KEY_FIELDS.map((f) => cdbLabelKey(f.label)));
+
 let cdbFileOpen = false;
 function cdbFilePanel(p) {
   let pairs = [];
   try { pairs = JSON.parse(p.cdbData || '[]'); } catch { pairs = []; }
   if (!Array.isArray(pairs) || !pairs.length) return '';
   const filled = pairs.filter(([, v]) => String(v ?? '').trim()).length;
+  const valueOf = new Map(pairs.map(([k, v]) => [cdbLabelKey(k), String(v ?? '').trim()]));
   return html`
     <section class="panel cdb-file">
+      <div class="panel-head">
+        <h3>${icon('file', 16)} CDB File</h3>
+        <span class="muted small">${p.cdbUpdatedAt ? html`${tr('آخر تحديث', 'Updated')} ${fmtTime(p.cdbUpdatedAt) || p.cdbUpdatedAt}` : ''}</span>
+      </div>
+      <div class="cdb-key-box">${CDB_KEY_FIELDS.map((f) => {
+        const val = valueOf.get(cdbLabelKey(f.label)) || '';
+        return html`<div class="cdb-key${f.wide ? ' wide' : ''}">
+          <div class="cdb-key-label">${f.label}</div>
+          <div class="cdb-key-value${val ? '' : ' is-empty'}">${val || '—'}</div>
+        </div>`;
+      })}</div>
       <details data-cdb-file ${cdbFileOpen ? 'open' : ''}>
-        <summary class="panel-head">
-          <h3>${icon('file', 16)} CDB File</h3>
-          <span class="muted small">${filled} ${tr('خانة معبّأة', 'filled fields')}${p.cdbUpdatedAt ? html` · ${tr('آخر تحديث', 'updated')} ${fmtTime(p.cdbUpdatedAt) || p.cdbUpdatedAt}` : ''}</span>
-        </summary>
+        <summary class="cdb-all-summary">${tr('كل خانات CDB', 'All CDB fields')} <span class="muted">(${filled} ${tr('معبّأة من', 'filled of')} ${pairs.length})</span></summary>
         <dl class="cdb-grid">${pairs.map(([k, v]) => {
           const val = String(v ?? '').trim();
-          return html`<dt>${k}</dt><dd class="${val ? '' : 'muted'}">${val || '—'}</dd>`;
+          const key = CDB_KEY_SET.has(cdbLabelKey(k)) ? 'is-key' : '';
+          return html`<dt class="${key}">${k}</dt><dd class="${key} ${val ? '' : 'muted'}">${val || '—'}</dd>`;
         })}</dl>
       </details>
     </section>`;

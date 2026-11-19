@@ -71,6 +71,7 @@ export function renderDrawer() {
         <button class="chip ${i.sev === 'high' ? 'red' : i.sev === 'mid' ? 'amber' : ''}" data-action="fix-issue" data-key="${i.key}" title="${tr('اضغط للإصلاح', 'Click to fix')}">${icon('alert', 13)} ${i.l}</button>`)}</div>` : ''}
     </div>
     <div class="drawer-body">
+      ${cdbFilePanel(p)}
       <section class="panel">
         <div class="panel-head"><h3>${tr('المتابعات', 'Follow-ups')}</h3>
           <button class="btn btn-sm" data-action="new-followup" data-patient="${p.id}">${icon('plus', 16)} ${tr('متابعة', 'Follow-up')}</button></div>
@@ -123,10 +124,35 @@ export function renderDrawer() {
 
       ${p.notes ? html`<section class="panel"><div class="panel-head"><h3>${tr('ملاحظات', 'Notes')}</h3></div><div class="panel-body" style="white-space:pre-wrap">${p.notes}</div></section>` : ''}
     </div>`);
+  el.querySelector('[data-cdb-file]')?.addEventListener('toggle', (e) => { cdbFileOpen = e.target.open; });
+}
+
+// Read-only copy of the patient's row in the CDB (OncoCoord) Excel tracker, written by CDB on each
+// Excel upload (only when a column changed). Stored as JSON [[column, value], ...] in `cdbData`.
+// Open/closed state survives the drawer's re-renders.
+let cdbFileOpen = false;
+function cdbFilePanel(p) {
+  let pairs = [];
+  try { pairs = JSON.parse(p.cdbData || '[]'); } catch { pairs = []; }
+  if (!Array.isArray(pairs) || !pairs.length) return '';
+  const filled = pairs.filter(([, v]) => String(v ?? '').trim()).length;
+  return html`
+    <section class="panel cdb-file">
+      <details data-cdb-file ${cdbFileOpen ? 'open' : ''}>
+        <summary class="panel-head">
+          <h3>${icon('file', 16)} CDB File</h3>
+          <span class="muted small">${filled} ${tr('خانة معبّأة', 'filled fields')}${p.cdbUpdatedAt ? html` · ${tr('آخر تحديث', 'updated')} ${fmtTime(p.cdbUpdatedAt) || p.cdbUpdatedAt}` : ''}</span>
+        </summary>
+        <dl class="cdb-grid">${pairs.map(([k, v]) => {
+          const val = String(v ?? '').trim();
+          return html`<dt>${k}</dt><dd class="${val ? '' : 'muted'}">${val || '—'}</dd>`;
+        })}</dl>
+      </details>
+    </section>`;
 }
 
 function activityItem(a) {
-  const changes = (a.changes || []).filter((c) => !['custom', 'ignoredIssues'].includes(c.f));
+  const changes = (a.changes || []).filter((c) => !['custom', 'ignoredIssues', 'cdbData', 'cdbUpdatedAt'].includes(c.f));
   const what = a.action === 'note' ? a.summary : `${pick(ACTION_LABELS[a.action]) || a.action} ${pick(TABLE_LABELS[a.table])}${a.summary ? ' — ' + a.summary : ''}`;
   return html`<li>
     <div class="when">${fmtTime(a.at)}${a.by ? html`<br>${a.by}` : ''}</div>

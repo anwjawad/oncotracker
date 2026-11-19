@@ -440,3 +440,15 @@ dialog.modal::backdrop { background: rgba(18, 22, 42, .45); backdrop-filter: blu
   .search-box { min-width: 0; flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* CDB File: read-only snapshot of the patient's row in the CDB (OncoCoord) Excel tracker */
+.cdb-file details > summary { cursor: pointer; list-style: none; }
+.cdb-file details > summary::-webkit-details-marker { display: none; }
+.cdb-file details:not([open]) > summary { border-bottom: 0; }
+.cdb-file details > summary h3::after { content: ' ▸'; color: var(--ink-3); font-size: 12px; }
+.cdb-file details[open] > summary h3::after { content: ' ▾'; }
+.cdb-grid { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; margin: 0; padding: 8px 18px 14px; font-size: 13px; }
+.cdb-grid dt, .cdb-grid dd { margin: 0; padding: 6px 8px; border-bottom: 1px solid var(--line-2); }
+.cdb-grid dt { color: var(--ink-2); font-weight: 600; direction: ltr; text-align: start; }
+.cdb-grid dd { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .cdb-grid { grid-template-columns: 1fr; } .cdb-grid dt { border-bottom: 0; padding-bottom: 0; } }

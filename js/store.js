@@ -132,10 +132,30 @@ export function clearCache() {
 }
 
 // ---------- mutations ----------
+// Multi-device safety: an upsert op keeps the full local row (for display) but records which
+// fields this device actually changed (`fields`). Only those fields are sent, so two people
+// editing different fields of the same row never overwrite each other. `full` marks a row
+// created on this device (all fields are new). Ops cached by older versions have neither and
+// are treated as full, as before.
+const isFull = (op) => op.full || !Array.isArray(op.fields);
+
+// Merges two pending upserts of the same row: newest values, union of changed fields.
+function combineOps(older, newer) {
+  if (isFull(older) || isFull(newer)) return { ...newer, full: true, fields: undefined };
+  return { ...newer, fields: [...new Set([...older.fields, ...newer.fields])] };
+}
+
+function wireRow(op) {
+  if (isFull(op)) return encodeRow(op.row);
+  const out = { id: op.row.id };
+  for (const f of op.fields) if (f in op.row) out[f] = op.row[f];
+  return encodeRow(out);
+}
+
 function enqueue(op) {
   if (op.op === 'upsert') {
     const i = outbox.findIndex((o) => o.op === 'upsert' && o.table === op.table && o.row.id === op.row.id);
-    if (i > -1) outbox[i] = op; else outbox.push(op);
+    if (i > -1) outbox[i] = combineOps(outbox[i], op); else outbox.push(op);
   } else outbox.push(op);
   setStatus({ state: 'saving' });
   scheduleFlush();
@@ -185,7 +205,9 @@ export function upsert(table, patch, audit) {
     for (const [k, d] of Object.entries(JSON_FIELDS[table] || {})) if (!(k in row)) row[k] = structuredClone(d);
   }
   store.data[table][row.id] = row;
-  enqueue({ op: 'upsert', table, row });
+  enqueue(prev
+    ? { op: 'upsert', table, row, fields: [...new Set([...Object.keys(patch).filter((k) => k !== 'id'), 'updatedAt'])] }
+    : { op: 'upsert', table, row, full: true });
   if (audit !== false) logActivity(table, prev, row, audit || {});
   changed();
   return row;
@@ -213,15 +235,20 @@ export async function flush() {
   inflight = outbox.splice(0, 250);
   setStatus({ state: 'saving' });
   try {
-    await api.call('APPLY', { ops: inflight.map((o) => ({ op: o.op, table: o.table, row: encodeRow(o.row) })) });
+    await api.call('APPLY', { ops: inflight.map((o) => ({ op: o.op, table: o.table, row: o.op === 'upsert' ? wireRow(o) : encodeRow(o.row) })) });
     inflight = [];
     retryDelay = 0;
     persist();
     if (outbox.length) { scheduleFlush(50); return; }
     setStatus({ state: 'saved', error: '' });
   } catch (e) {
-    // Put failed ops back unless a newer edit of the same row is already queued.
-    const back = inflight.filter((o) => !(o.op === 'upsert' && outbox.some((q) => q.op === 'upsert' && q.table === o.table && q.row.id === o.row.id)));
+    // Put failed ops back. If a newer edit of the same row is already queued, fold the failed
+    // one into it (its changed fields are kept) instead of dropping it.
+    const back = [];
+    for (const o of inflight) {
+      const i = o.op === 'upsert' ? outbox.findIndex((q) => q.op === 'upsert' && q.table === o.table && q.row.id === o.row.id) : -1;
+      if (i > -1) outbox[i] = combineOps(o, outbox[i]); else back.push(o);
+    }
     outbox = [...back, ...outbox];
     inflight = [];
     retryDelay = Math.min(retryDelay ? retryDelay * 2 : 3000, 60000);
@@ -229,6 +256,15 @@ export async function flush() {
     persist();
     scheduleFlush(retryDelay);
   }
+}
+
+// Append-only lists (call attempts, decision addenda, ignored alerts): two devices adding an
+// item at the same time must both be kept. Mirrors LIST_FIELDS in backend/Code.gs.
+const LIST_FIELDS = new Set(['attempts', 'addenda', 'ignoredIssues']);
+function unionIfList(table, field, serverVal, localVal) {
+  if (!LIST_FIELDS.has(field) || !Array.isArray(serverVal) || !Array.isArray(localVal)) return localVal;
+  const seenItems = new Set(serverVal.map((x) => JSON.stringify(x)));
+  return [...serverVal, ...localVal.filter((x) => !seenItems.has(JSON.stringify(x)))];
 }
 
 let syncing = false;
@@ -248,9 +284,15 @@ export async function sync() {
     }
     next.activity = (res.activity || []).map((r) => decodeRow('activity', r)).sort((a, b) => String(b.at).localeCompare(String(a.at)));
     const seen = new Set(next.activity.map((a) => a.id));
+    // Re-apply this device's unsent edits on top of the fresh server rows — only the fields
+    // it changed, so other people's newer values for the remaining fields are kept.
     for (const op of [...inflight, ...outbox]) {
-      if (op.op === 'upsert') next[op.table][op.row.id] = op.row;
-      else if (!seen.has(op.row.id)) next.activity.unshift(op.row);
+      if (op.op !== 'upsert') { if (!seen.has(op.row.id)) next.activity.unshift(op.row); continue; }
+      const server = next[op.table][op.row.id];
+      if (!server || isFull(op)) { next[op.table][op.row.id] = op.row; continue; }
+      const merged = { ...server };
+      for (const f of op.fields) if (f in op.row) merged[f] = unionIfList(op.table, f, server[f], op.row[f]);
+      next[op.table][op.row.id] = merged;
     }
     store.data = next;
     setStatus({ state: outbox.length ? 'saving' : 'saved', lastSync: nowISO(), error: '', oldBackend: false });

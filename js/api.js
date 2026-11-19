@@ -59,6 +59,14 @@ export function resetLocal(db) {
   if (db) writeLocal(db); else localStorage.removeItem(LOCAL_DB);
 }
 
+function unionList(stored, incoming) {
+  let a; let b;
+  try { a = JSON.parse(stored || '[]'); b = JSON.parse(incoming || '[]'); } catch { return incoming; }
+  if (!Array.isArray(a) || !Array.isArray(b)) return incoming;
+  const seen = new Set(a.map((x) => JSON.stringify(x)));
+  return JSON.stringify([...a, ...b.filter((x) => !seen.has(JSON.stringify(x)))]);
+}
+
 async function local(action, payload) {
   await new Promise((r) => setTimeout(r, 120));
   const db = readLocal();
@@ -72,7 +80,13 @@ async function local(action, payload) {
     }
     case 'APPLY': {
       for (const op of payload.ops || []) {
-        if (op.op === 'upsert') db[op.table][op.row.id] = { ...(db[op.table][op.row.id] || {}), ...op.row };
+        if (op.op === 'upsert') {
+          const prev = db[op.table][op.row.id] || {};
+          const row = { ...prev, ...op.row };
+          // Same as the server: append-only lists keep items added by other devices.
+          for (const f of ['attempts', 'addenda', 'ignoredIssues']) if (f in op.row && f in prev) row[f] = unionList(prev[f], op.row[f]);
+          db[op.table][op.row.id] = row;
+        }
         else if (op.op === 'append') db.activity.push(op.row);
       }
       if (db.activity.length > 20000) db.activity = db.activity.slice(-20000);

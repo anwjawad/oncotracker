@@ -147,7 +147,10 @@ function apply_(ops) {
         var at = rowOf[String(r.id)];
         if (op.op === 'upsert' && at) {
           var existing = bulk ? bulk[at - 2] : sh.getRange(at, 1, 1, headers.length).getValues()[0];
-          var merged = headers.map(function (h, j) { return r.hasOwnProperty(h) ? String(r[h]) : existing[j]; });
+          var merged = headers.map(function (h, j) {
+            if (!r.hasOwnProperty(h)) return existing[j];
+            return LIST_FIELDS[h] ? unionJsonList_(existing[j], r[h]) : String(r[h]);
+          });
           if (bulk) bulk[at - 2] = merged; else sh.getRange(at, 1, 1, headers.length).setValues([merged]);
         } else if (op.op === 'upsert' && appendIndex.hasOwnProperty(r.id)) {
           appends[appendIndex[r.id]] = headers.map(function (h) { return r.hasOwnProperty(h) ? String(r[h]) : ''; });
@@ -168,6 +171,25 @@ function apply_(ops) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Append-only JSON lists (call attempts, decision addenda, ignored alerts). When two devices
+// add an item to the same row at the same time, both items are kept instead of the later
+// save replacing the earlier one. Mirrors LIST_FIELDS in js/store.js.
+var LIST_FIELDS = { attempts: true, addenda: true, ignoredIssues: true };
+
+function unionJsonList_(stored, incoming) {
+  var a, b;
+  try { a = JSON.parse(stored || '[]'); } catch (x) { a = null; }
+  try { b = JSON.parse(incoming || '[]'); } catch (x) { b = null; }
+  if (!Array.isArray(a) || !Array.isArray(b)) return String(incoming);
+  var seen = {};
+  var out = [];
+  a.concat(b).forEach(function (item) {
+    var k = JSON.stringify(item);
+    if (!seen[k]) { seen[k] = true; out.push(item); }
+  });
+  return JSON.stringify(out);
 }
 
 // ---------- files ----------

@@ -1,5 +1,5 @@
 // Patient record: drawer with timeline, edit form with duplicate guard, merge.
-import { html, $, normMrn, cleanName, fmtDate, fmtTime } from './util.js';
+import { nationalIdOf, html, $, normMrn, cleanName, fmtDate, fmtTime } from './util.js';
 import { idx, patient, upsert, remove, batch, store } from './store.js';
 import { issuesFor, fuLabel, CASE_STATUS, caseStage, attemptLabel, fixPhone } from './rules.js';
 import { icon, modal, toast, confirmBox, telLink, dueChip, physicianFieldHTML, mountPhysicianField, readPhysician } from './ui.js';
@@ -62,7 +62,7 @@ export function renderDrawer() {
       </div>
       <div class="facts">
         <span>${tr('رقم الملف', 'File no.')}: <b class="ltr">${p.mrn || '—'}</b></span>
-        <span>${tr('رقم الهوية', 'ID no.')}: <b class="ltr">${p.nationalId || '—'}</b></span>
+        <span>${tr('رقم الهوية', 'ID no.')}: <b class="ltr">${nationalIdOf(p) || '—'}</b></span>
         <span>${tr('الهاتف', 'Phone')}: ${telLink(p.phone)}${p.phoneFlag === 'wrong' ? html` <span class="chip red">${tr('أُبلغ أنه خاطئ', 'reported wrong')}</span>` : ''}</span>
         ${p.age ? html`<span>${tr('العمر', 'Age')}: ${p.age}</span>` : ''}
         ${p.physician ? html`<span>${dr(p.physician)}</span>` : ''}
@@ -219,7 +219,7 @@ export async function editPatient(id, { focus } = {}) {
       <label class="field span-2"><span>${tr('الاسم الكامل', 'Full name')}</span><input name="name" value="${p.name}" required>
         <span class="hint">${tr('اكتب الاسم رباعياً كما في الهوية؛ لا تختصره.', 'Write the full name as on the ID; do not shorten it.')}</span></label>
       <label class="field"><span>${tr('رقم الملف', 'File number')}</span><input name="mrn" class="ltr" value="${p.mrn}"></label>
-      <label class="field"><span>${tr('رقم الهوية', 'ID number')}</span><input name="nationalId" class="ltr" value="${p.nationalId || ''}" inputmode="numeric"></label>
+      <label class="field"><span>${tr('رقم الهوية', 'ID number')}</span><input name="nationalId" class="ltr" value="${nationalIdOf(p)}" inputmode="numeric"></label>
       <label class="field"><span>${tr('العمر', 'Age')}</span><input name="age" value="${p.age || ''}" inputmode="numeric"></label>
       <label class="field"><span>${tr('الهاتف', 'Phone')}</span><input name="phone" class="ltr" value="${p.phone}" inputmode="tel"></label>
       <label class="field"><span>${tr('هاتف آخر', 'Phone 2')}</span><input name="phone2" class="ltr" value="${p.phone2 || ''}" inputmode="tel"></label>

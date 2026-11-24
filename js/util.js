@@ -185,3 +185,14 @@ export function loadXLSX() {
   });
   return xlsxPromise;
 }
+
+// National ID: the patient's own field, else the "ID" column of the CDB File snapshot
+// (patients who existed before the CDB link only received the snapshot).
+export function nationalIdOf(p) {
+  if (!p) return '';
+  if (p.nationalId) return String(p.nationalId).trim();
+  try {
+    const pair = (JSON.parse(p.cdbData || '[]') || []).find(([k]) => String(k ?? '').trim().toLowerCase() === 'id');
+    return pair ? String(pair[1] ?? '').replace(/\s+/g, '').replace(/\.0+$/, '') : '';
+  } catch { return ''; }
+}

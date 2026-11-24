@@ -1,6 +1,6 @@
 // Offline shell: network first for app files, cached copy when offline.
 // Data never goes through this cache — it lives in the Google Sheet.
-const CACHE = 'onco-v2-shell-7';
+const CACHE = 'onco-v2-shell-8';
 const SHELL = [
   './', 'index.html', 'manifest.json', 'css/app.css',
   'js/main.js', 'js/i18n.js', 'js/util.js', 'js/settings.js', 'js/api.js', 'js/store.js', 'js/rules.js', 'js/ui.js', 'js/registry.js',
@@ -10,7 +10,7 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

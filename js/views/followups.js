@@ -1,6 +1,6 @@
 // Follow-ups: one board of dated tasks (manual + automatic from clinic visits),
 // grouped by urgency, with call attempts, snooze and a required outcome to close.
-import { html, todayISO, addDays, diffDays, fmtDate, fmtTime, matchesQuery, uniq, byText } from '../util.js';
+import { nationalIdOf, html, todayISO, addDays, diffDays, fmtDate, fmtTime, matchesQuery, uniq, byText } from '../util.js';
 import { idx, patient, get, create, upsert, batch } from '../store.js';
 import { FU_TYPES, fuLabel, ATTEMPT_RESULTS, attemptLabel, openTasks, autoTasks } from '../rules.js';
 import { icon, modal, toast, dueChip, menu, telLink, patientPickerHTML, mountPatientPicker, resolvePatient, validatePicker } from '../ui.js';
@@ -35,8 +35,9 @@ function sourceChip(t) {
 // National ID next to the file number; click to add it when missing, or to correct it.
 function idChip(p) {
   if (!p?.id) return '';
-  return p.nationalId
-    ? html`<button class="id-chip" data-action="fu-set-id" data-id="${p.id}" title="${tr('تعديل رقم الهوية', 'Edit ID number')}">${tr('هوية', 'ID')}: <b class="ltr">${p.nationalId}</b></button>`
+  const nid = nationalIdOf(p);
+  return nid
+    ? html`<button class="id-chip" data-action="fu-set-id" data-id="${p.id}" title="${tr('تعديل رقم الهوية', 'Edit ID number')}">${tr('هوية', 'ID')}: <b class="ltr">${nid}</b></button>`
     : html`<button class="id-chip missing" data-action="fu-set-id" data-id="${p.id}">${icon('plus', 12)} ${tr('رقم الهوية', 'ID number')}</button>`;
 }
 
@@ -46,7 +47,7 @@ async function setNationalId(patientId) {
   const data = await modal({
     title: tr('رقم الهوية', 'ID number'),
     body: html`<div class="small muted" style="margin-bottom:8px">${p.name} — <span class="ltr">${p.mrn || ''}</span></div>
-      <label class="field"><span>${tr('رقم الهوية', 'ID number')}</span><input name="nationalId" class="ltr" inputmode="numeric" value="${p.nationalId || ''}" autofocus></label>`,
+      <label class="field"><span>${tr('رقم الهوية', 'ID number')}</span><input name="nationalId" class="ltr" inputmode="numeric" value="${nationalIdOf(p)}" autofocus></label>`,
     primary: tr('حفظ', 'Save'),
   });
   if (!data) return;
@@ -106,7 +107,7 @@ export function render() {
 
   if (ui.fuType !== 'ALL') tasks = tasks.filter((t) => t.type === ui.fuType);
   if (ui.fuDoctor !== 'ALL') tasks = tasks.filter((t) => t.physician === ui.fuDoctor);
-  if (ui.fuQuery) tasks = tasks.filter((t) => matchesQuery(ui.fuQuery, t.p.name, t.p.mrn, t.p.nationalId, t.title, t.physician));
+  if (ui.fuQuery) tasks = tasks.filter((t) => matchesQuery(ui.fuQuery, t.p.name, t.p.mrn, nationalIdOf(t.p), t.title, t.physician));
 
   const toolbar = html`
     <div class="toolbar">
@@ -282,7 +283,7 @@ function printList() {
     title: tr('قائمة المتابعات المفتوحة', 'Open follow-ups'),
     subtitle: [ui.fuType !== 'ALL' ? fuLabel(ui.fuType) : '', ui.fuDoctor !== 'ALL' ? dr(ui.fuDoctor) : ''].filter(Boolean).join(' — '),
     columns: [{ label: tr('المريض', 'Patient') }, { label: tr('رقم الملف', 'File no.') }, { label: tr('رقم الهوية', 'ID no.') }, { label: tr('الهاتف', 'Phone') }, { label: tr('النوع', 'Type') }, { label: tr('المطلوب', 'Task'), width: '30%' }, { label: tr('الطبيب', 'Doctor') }, { label: tr('الاستحقاق', 'Due') }, { label: tr('ملاحظات', 'Notes'), width: '14%' }],
-    rows: tasks.map((t) => [t.p.name, t.p.mrn, t.p.nationalId || '', t.p.phone, fuLabel(t.type), t.title, t.physician ? dr(t.physician) : '', t.dueDate ? fmtDate(t.dueDate) : '—', '']),
+    rows: tasks.map((t) => [t.p.name, t.p.mrn, nationalIdOf(t.p), t.p.phone, fuLabel(t.type), t.title, t.physician ? dr(t.physician) : '', t.dueDate ? fmtDate(t.dueDate) : '—', '']),
   });
 }
 

@@ -101,6 +101,8 @@ export function renderDrawer() {
           : html`<div class="empty">${tr('لم يُعرض على اللجنة.', 'Not presented to the committee.')}</div>`}
       </section>
 
+      ${tumorBoardPanel(p)}
+
       <section class="panel">
         <div class="panel-head"><h3>${tr('زيارات العيادة', 'Clinic visits')}</h3>
           <button class="btn btn-sm" data-action="new-visit" data-patient="${p.id}">${icon('plus', 16)} ${tr('زيارة', 'Visit')}</button></div>
@@ -171,6 +173,28 @@ function cdbFilePanel(p) {
           return html`<dt class="${key}">${k}</dt><dd class="${key} ${val ? '' : 'muted'}">${val || '—'}</dd>`;
         })}</dl>
       </details>
+    </section>`;
+}
+
+// Tumor board entries for this patient, with their follow-up tasks (see views/tumorboard.js).
+function tumorBoardPanel(p) {
+  const entries = (idx().tumorboardBy?.get(p.id) || []).slice().sort((a, b) => String(b.boardDate || '').localeCompare(String(a.boardDate || '')));
+  const tasksFor = (e) => (idx().followupsBy.get(p.id) || []).filter((f) => f.sourceType === 'tumorboard' && f.sourceId === e.id && f.status !== 'cancelled');
+  return html`
+    <section class="panel">
+      <div class="panel-head"><h3>${tr('لجنة الأورام (Tumor Board)', 'Tumor board')}</h3>
+        <button class="btn btn-sm" data-action="tb-add-patient" data-patient="${p.id}">${icon('plus', 16)} ${tr('إضافة للجنة الأورام', 'Add to tumor board')}</button></div>
+      ${entries.length ? html`<ul class="mini-list">${entries.map((e) => {
+        const tasks = tasksFor(e);
+        const open = tasks.filter((f) => f.status === 'open' || f.status === 'waiting').length;
+        return html`<li><div>
+          <div><strong>${e.boardDate ? fmtDate(e.boardDate, 'med') : ''}</strong> ${e.status === 'closed' ? html`<span class="chip">${tr('مُغلقة', 'Closed')}</span>` : ''}
+            ${tasks.length ? html`<span class="chip ${open ? 'amber' : 'green'}">${open ? tr(`${open} مهمة مفتوحة`, `${open} open`) : tr('كل المهام منجزة', 'All done')}</span>` : ''}
+            <span class="muted small">${e.physician ? dr(e.physician) : ''}</span></div>
+          ${e.discussion ? html`<div class="small" style="white-space:pre-wrap">${e.discussion}</div>` : e.briefHistory ? html`<div class="small muted">${e.briefHistory}</div>` : ''}
+        </div>
+        <a class="btn btn-sm btn-ghost" href="#/tumorboard?focus=${e.id}" data-action="close-drawer">${tr('فتح', 'Open')}</a></li>`; })}</ul>`
+        : html`<div class="empty">${tr('لم يُعرض على لجنة الأورام.', 'Not on the tumor board.')}</div>`}
     </section>`;
 }
 

@@ -16,6 +16,7 @@ function enrich(t) {
   let src = null;
   if (t.sourceType === 'visit') src = get('visits', t.sourceId);
   if (t.sourceType === 'committee') src = get('committee', t.sourceId);
+  if (t.sourceType === 'tumorboard') src = get('tumorboard', t.sourceId);
   return { ...t, p, src, physician: t.physician || src?.physician || p.physician || '' };
 }
 
@@ -27,6 +28,7 @@ function findTask(id) {
 function sourceChip(t) {
   if (t.sourceType === 'visit' && t.src) return html`<span class="chip outline">${tr('عيادة', 'Clinic')} ${fmtDate(t.src.sessionDate)}</span>`;
   if (t.sourceType === 'committee' && t.src) return html`<span class="chip outline">${tr('لجنة', 'Committee')} ${fmtDate(t.src.sessionDate)}</span>`;
+  if (t.sourceType === 'tumorboard' && t.src) return html`<a class="chip accent" href="#/tumorboard?focus=${t.src.id}">Tumor board${t.src.boardDate ? ' ' + fmtDate(t.src.boardDate) : ''}</a>`;
   return '';
 }
 
@@ -37,7 +39,7 @@ export function taskRow(t, { compact = false } = {}) {
   <div class="task ${auto ? 'auto' : ''}">
     <div>${dueChip(t.dueDate, t.status)}<div class="small muted">${t.dueDate ? fmtDate(t.dueDate, 'med') : ''}</div></div>
     <div>
-      <div class="task-title"><span class="chip ${auto ? 'blue' : 'outline'}">${auto ? tr('تلقائية', 'Automatic') : fuLabel(t.type)}</span> ${t.title}</div>
+      <div class="task-title" style="white-space:pre-wrap"><span class="chip ${auto ? 'blue' : 'outline'}">${auto ? tr('تلقائية', 'Automatic') : fuLabel(t.type)}</span> ${t.title}</div>
       <div class="task-meta">
         <button class="patient-link" data-action="open-patient" data-id="${t.patientId}">${t.p.name || tr('مريض غير معروف', 'Unknown patient')}</button>
         <span class="mrn">${t.p.mrn || ''}</span>

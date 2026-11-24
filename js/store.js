@@ -9,8 +9,8 @@ import { settings } from './settings.js';
 import { uid, nowISO, normMrn } from './util.js';
 import { tr } from './i18n.js';
 
-export const TABLES = ['patients', 'visits', 'committee', 'followups'];
-const PREFIX = { patients: 'P', visits: 'V', committee: 'C', followups: 'F', activity: 'A' };
+export const TABLES = ['patients', 'visits', 'committee', 'followups', 'tumorboard'];
+const PREFIX = { patients: 'P', visits: 'V', committee: 'C', followups: 'F', tumorboard: 'B', activity: 'A' };
 const JSON_FIELDS = {
   patients: { ignoredIssues: [] },
   visits: { custom: {} },
@@ -37,7 +37,7 @@ let batchDirty = false;
 const listeners = new Set();
 
 function emptyData() {
-  return { patients: {}, visits: {}, committee: {}, followups: {}, activity: [] };
+  return { patients: {}, visits: {}, committee: {}, followups: {}, tumorboard: {}, activity: [] };
 }
 
 export const subscribe = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
@@ -230,9 +230,22 @@ function scheduleFlush(ms = 500) {
   flushTimer = setTimeout(flush, ms);
 }
 
+// An Apps Script still running an older Code.gs rejects a whole batch that touches a table it
+// doesn't know (e.g. the tumor board). Such ops wait in the outbox, kept on this device, while
+// everything else keeps saving; they go out once a sync shows the server has that table.
+function serverHasTable(table) {
+  if (api.mode() !== 'remote' || !Array.isArray(store.serverTables) || !TABLES.includes(table)) return true;
+  return store.serverTables.includes(table);
+}
+
 export async function flush() {
   if (inflight.length || !outbox.length) return;
-  inflight = outbox.splice(0, 250);
+  const picked = [];
+  const held = [];
+  for (const o of outbox) (picked.length < 250 && serverHasTable(o.table) ? picked : held).push(o);
+  if (!picked.length) { setStatus({ state: 'error', error: tr('بعض التعديلات بانتظار نشر Code.gs الجديد على الخادم', 'Some changes are waiting for the new Code.gs to be deployed') }); return; }
+  inflight = picked;
+  outbox = held;
   setStatus({ state: 'saving' });
   try {
     await api.call('APPLY', { ops: inflight.map((o) => ({ op: o.op, table: o.table, row: o.op === 'upsert' ? wireRow(o) : encodeRow(o.row) })) });
@@ -295,6 +308,8 @@ export async function sync() {
       next[op.table][op.row.id] = merged;
     }
     store.data = next;
+    store.serverTables = Object.keys(res.tables || {});
+    if (outbox.length) scheduleFlush(50);
     setStatus({ state: outbox.length ? 'saving' : 'saved', lastSync: nowISO(), error: '', oldBackend: false });
     changed();
   } catch (e) {
@@ -331,6 +346,7 @@ export function idx() {
     visitsBy: group(lists.visits),
     committeeBy: group(lists.committee),
     followupsBy: group(lists.followups),
+    tumorboardBy: group(lists.tumorboard),
     byMrn,
     physicians: [...physicians].sort((a, b) => a.localeCompare(b, 'ar')),
   };

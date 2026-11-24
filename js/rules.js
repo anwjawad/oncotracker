@@ -18,6 +18,22 @@ export const FU_TYPES = [
 ];
 export const fuLabel = (v) => (FU_TYPES.find((t) => t.v === v) || FU_TYPES.at(-1)).l;
 
+// Tumor board follow-up tasks (from the department's tumor board checklist). Each becomes a
+// normal follow-up (sourceType 'tumorboard') of the matching type, with this title.
+export const TB_TASKS = [
+  term('referral_submit', 'تقديم تحويلة', 'Submit referral', { fu: 'REFERRAL' }),
+  term('referral_followup', 'متابعة تحويلة', 'Referral follow-up', { fu: 'REFERRAL' }),
+  term('permit_submit', 'تقديم تصريح', 'Submit permit', { fu: 'PERMIT' }),
+  term('clinic_booking', 'حجز عيادة', 'Clinic booking', { fu: 'APPOINTMENT', needsClinic: true }),
+  term('imaging_request', 'طلب صور طبية', 'Imaging request', { fu: 'TESTS' }),
+  term('lab_request', 'طلب فحوصات طبية', 'Lab request', { fu: 'TESTS' }),
+  term('other', 'متابعة أخرى', 'Other', { fu: 'OTHER', needsTitle: true }),
+];
+export const TB_STATUS = {
+  active: term('active', 'قيد المتابعة', 'Active', { chip: 'blue' }),
+  closed: term('closed', 'مُغلقة', 'Closed', { chip: '' }),
+};
+
 export const ATTEMPT_RESULTS = [
   term('NO_ANSWER', 'لم يرد', 'No answer'),
   term('OFF', 'الهاتف مغلق', 'Phone off'),

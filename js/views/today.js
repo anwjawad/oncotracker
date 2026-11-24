@@ -14,7 +14,7 @@ export function render() {
   const { lists } = idx();
 
   const due = openTasks().filter((t) => t.dueDate && t.dueDate <= today)
-    .map((t) => ({ ...t, p: patient(t.patientId) || {}, src: t.sourceType === 'visit' ? get('visits', t.sourceId) : t.sourceType === 'committee' ? get('committee', t.sourceId) : null }))
+    .map((t) => ({ ...t, p: patient(t.patientId) || {}, src: t.sourceType === 'visit' ? get('visits', t.sourceId) : t.sourceType === 'committee' ? get('committee', t.sourceId) : t.sourceType === 'tumorboard' ? get('tumorboard', t.sourceId) : null }))
     .map((t) => ({ ...t, physician: t.physician || t.src?.physician || t.p.physician || '' }))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const overdue = due.filter((t) => t.dueDate < today).length;

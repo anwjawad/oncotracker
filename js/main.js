@@ -12,12 +12,13 @@ import * as today from './views/today.js';
 import * as committee from './views/committee.js';
 import * as clinic from './views/clinic.js';
 import * as followups from './views/followups.js';
+import * as tumorboard from './views/tumorboard.js';
 import * as patients from './views/patients.js';
 import * as quality from './views/quality.js';
 import * as reports from './views/reports.js';
 import * as settingsView from './views/settings.js';
 
-const ROUTES = { today, committee, clinic, followups, patients, quality, reports, settings: settingsView };
+const ROUTES = { today, committee, tumorboard, clinic, followups, patients, quality, reports, settings: settingsView };
 const STABLE = new Set(['settings']);   // forms that must not be re-rendered by background changes
 let current = 'today';
 
@@ -53,6 +54,7 @@ document.addEventListener('focusout', () => { if (pendingRender) { pendingRender
 const NAV = {
   today: ['اليوم', 'Today'],
   committee: ['لجنة الحالات الجديدة', 'New cases committee'],
+  tumorboard: ['لجنة الأورام (Tumor Board)', 'Tumor board'],
   clinic: ['حجوزات ما بعد العيادة', 'Post-clinic bookings'],
   followups: ['المتابعات', 'Follow-ups'],
   patients: ['المرضى', 'Patients'],
@@ -83,6 +85,8 @@ function renderChrome() {
   const nextDate = committee.nextSession();
   const n = idx().lists.committee.filter((c) => c.sessionDate === nextDate).length;
   $('[data-count=committee]').textContent = n || '';
+  const tbOpen = idx().lists.tumorboard.filter((e) => e.status !== 'closed').reduce((k, e) => k + tumorboard.openTasksOf(e).length, 0);
+  $('[data-count=tumorboard]').textContent = tbOpen || '';
   renderBanner();
 }
 

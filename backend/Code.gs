@@ -13,13 +13,15 @@
  */
 
 var SCHEMA = {
-  Patients: ['id', 'mrn', 'name', 'phone', 'phone2', 'age', 'gender', 'physician', 'diagnosis', 'notes', 'phoneFlag', 'ignoredIssues', 'mergedInto', 'createdAt', 'updatedAt', 'deleted'],
+  Patients: ['id', 'mrn', 'name', 'phone', 'phone2', 'age', 'gender', 'physician', 'diagnosis', 'notes', 'phoneFlag', 'ignoredIssues', 'mergedInto', 'nationalId', 'cdbData', 'cdbUpdatedAt', 'createdAt', 'updatedAt', 'deleted'],
   ClinicVisits: ['id', 'patientId', 'sessionDate', 'physician', 'plan', 'opcDate', 'permit', 'referral', 'notified', 'noteUrl', 'autoClosed', 'custom', 'createdAt', 'updatedAt', 'deleted'],
   CommitteeCases: ['id', 'patientId', 'sessionDate', 'physician', 'briefHistory', 'question', 'plan', 'decision', 'status', 'ready', 'notes', 'sourceVisitId', 'carriedFromId', 'deferredToId', 'decidedAt', 'addenda', 'createdAt', 'updatedAt', 'deleted'],
   FollowUps: ['id', 'patientId', 'sourceType', 'sourceId', 'type', 'title', 'dueDate', 'status', 'outcome', 'attempts', 'createdAt', 'closedAt', 'updatedAt', 'deleted'],
+  // Tumor board entries; their tasks are FollowUps rows with sourceType 'tumorboard'.
+  TumorBoard: ['id', 'patientId', 'physician', 'boardDate', 'briefHistory', 'discussion', 'status', 'notes', 'createdAt', 'updatedAt', 'deleted'],
   Activity: ['id', 'at', 'by', 'table', 'rowId', 'patientId', 'action', 'summary', 'changes']
 };
-var TABLES = { patients: 'Patients', visits: 'ClinicVisits', committee: 'CommitteeCases', followups: 'FollowUps', activity: 'Activity' };
+var TABLES = { patients: 'Patients', visits: 'ClinicVisits', committee: 'CommitteeCases', followups: 'FollowUps', tumorboard: 'TumorBoard', activity: 'Activity' };
 var ACTIVITY_RETURN = 3000;
 
 // ---------- setup ----------
@@ -103,7 +105,7 @@ function isDeleted_(r) { return r.deleted === '1' || String(r.deleted).toUpperCa
 
 function sync_() {
   var tables = {};
-  ['patients', 'visits', 'committee', 'followups'].forEach(function (t) {
+  ['patients', 'visits', 'committee', 'followups', 'tumorboard'].forEach(function (t) {
     tables[t] = readTable_(TABLES[t]).filter(function (r) { return !isDeleted_(r); });
   });
   var activity = readTable_('Activity');

@@ -4,7 +4,7 @@ import { settings, DEFAULT_API_URL } from './settings.js';
 import { tr } from './i18n.js';
 
 const LOCAL_DB = 'onco.v2.localdb';
-const TABLES = ['patients', 'visits', 'committee', 'followups'];
+const TABLES = ['patients', 'visits', 'committee', 'followups', 'tumorboard'];
 
 export const api = {
   mode() { return settings.get('localMode') ? 'local' : 'remote'; },
@@ -50,7 +50,7 @@ function readLocal() {
     const db = JSON.parse(localStorage.getItem(LOCAL_DB) || 'null');
     if (db) return db;
   } catch { /* fall through */ }
-  return { patients: {}, visits: {}, committee: {}, followups: {}, activity: [] };
+  return { patients: {}, visits: {}, committee: {}, followups: {}, tumorboard: {}, activity: [] };
 }
 function writeLocal(db) {
   localStorage.setItem(LOCAL_DB, JSON.stringify(db));
@@ -75,12 +75,13 @@ async function local(action, payload) {
       return { ok: true, mode: 'local' };
     case 'SYNC': {
       const tables = {};
-      for (const t of TABLES) tables[t] = Object.values(db[t]).filter((r) => !r.deleted);
+      for (const t of TABLES) tables[t] = Object.values(db[t] || {}).filter((r) => !r.deleted);
       return { tables, activity: db.activity.slice(-3000), serverTime: new Date().toISOString() };
     }
     case 'APPLY': {
       for (const op of payload.ops || []) {
         if (op.op === 'upsert') {
+          db[op.table] = db[op.table] || {};
           const prev = db[op.table][op.row.id] || {};
           const row = { ...prev, ...op.row };
           // Same as the server: append-only lists keep items added by other devices.

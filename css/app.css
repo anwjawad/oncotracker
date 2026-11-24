@@ -229,6 +229,10 @@ textarea.cell-input { resize: vertical; min-height: 34px; line-height: 1.5; fiel
 .patient-link { background: none; border: 0; padding: 0; font-weight: 600; color: var(--ink); cursor: pointer; text-align: start; }
 .patient-link:hover { color: var(--accent-ink); text-decoration: underline; }
 .mrn { font-size: 12.5px; color: var(--ink-3); direction: ltr; unicode-bidi: isolate; }
+.id-chip { font: inherit; font-size: 12.5px; color: var(--ink-3); background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+.id-chip:hover { color: var(--ink); text-decoration: underline; }
+.id-chip.missing { color: var(--accent); border: 1px dashed currentColor; border-radius: 999px; padding: 0 8px; }
+.id-chip.missing:hover { text-decoration: none; background: color-mix(in srgb, currentColor 8%, transparent); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-s); overflow: hidden; }
 .seg button { border: 0; background: var(--surface); padding: 4px 9px; min-width: 32px; min-height: 32px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-3); }
 .seg button + button { border-inline-start: 1px solid var(--line); }

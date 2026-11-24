@@ -32,6 +32,30 @@ function sourceChip(t) {
   return '';
 }
 
+// National ID next to the file number; click to add it when missing, or to correct it.
+function idChip(p) {
+  if (!p?.id) return '';
+  return p.nationalId
+    ? html`<button class="id-chip" data-action="fu-set-id" data-id="${p.id}" title="${tr('تعديل رقم الهوية', 'Edit ID number')}">${tr('هوية', 'ID')}: <b class="ltr">${p.nationalId}</b></button>`
+    : html`<button class="id-chip missing" data-action="fu-set-id" data-id="${p.id}">${icon('plus', 12)} ${tr('رقم الهوية', 'ID number')}</button>`;
+}
+
+async function setNationalId(patientId) {
+  const p = patient(patientId);
+  if (!p) return;
+  const data = await modal({
+    title: tr('رقم الهوية', 'ID number'),
+    body: html`<div class="small muted" style="margin-bottom:8px">${p.name} — <span class="ltr">${p.mrn || ''}</span></div>
+      <label class="field"><span>${tr('رقم الهوية', 'ID number')}</span><input name="nationalId" class="ltr" inputmode="numeric" value="${p.nationalId || ''}" autofocus></label>`,
+    primary: tr('حفظ', 'Save'),
+  });
+  if (!data) return;
+  const v = String(data.nationalId || '').replace(/\s+/g, '').trim();
+  if (v === (p.nationalId || '')) return;
+  upsert('patients', { id: p.id, nationalId: v }, { summary: v ? `${tr('رقم الهوية', 'ID number')}: ${v}` : tr('حُذف رقم الهوية', 'ID number removed') });
+  toast(v ? tr('حُفظ رقم الهوية', 'ID number saved') : tr('حُذف رقم الهوية', 'ID number removed'));
+}
+
 export function taskRow(t, { compact = false } = {}) {
   const last = (t.attempts || []).at(-1);
   const auto = !!t.auto;
@@ -43,6 +67,7 @@ export function taskRow(t, { compact = false } = {}) {
       <div class="task-meta">
         <button class="patient-link" data-action="open-patient" data-id="${t.patientId}">${t.p.name || tr('مريض غير معروف', 'Unknown patient')}</button>
         <span class="mrn">${t.p.mrn || ''}</span>
+        ${idChip(t.p)}
         <span>${icon('phone', 13)} ${telLink(t.p.phone)}</span>
         ${t.physician ? html`<span>${dr(t.physician)}</span>` : ''}
         ${compact ? '' : sourceChip(t)}
@@ -81,7 +106,7 @@ export function render() {
 
   if (ui.fuType !== 'ALL') tasks = tasks.filter((t) => t.type === ui.fuType);
   if (ui.fuDoctor !== 'ALL') tasks = tasks.filter((t) => t.physician === ui.fuDoctor);
-  if (ui.fuQuery) tasks = tasks.filter((t) => matchesQuery(ui.fuQuery, t.p.name, t.p.mrn, t.title, t.physician));
+  if (ui.fuQuery) tasks = tasks.filter((t) => matchesQuery(ui.fuQuery, t.p.name, t.p.mrn, t.p.nationalId, t.title, t.physician));
 
   const toolbar = html`
     <div class="toolbar">
@@ -89,7 +114,7 @@ export function render() {
         <button class="tab ${ui.fuShow === 'open' ? 'active' : ''}" data-action="fu-show" data-v="open">${tr('المفتوحة', 'Open')}</button>
         <button class="tab ${ui.fuShow === 'done' ? 'active' : ''}" data-action="fu-show" data-v="done">${tr('المنجزة (30 يوماً)', 'Done (30 days)')}</button>
       </div>
-      <label class="search-box"><input class="input" type="search" placeholder="${tr('بحث بالاسم أو رقم الملف أو المهمة', 'Search name, file number or task')}" value="${ui.fuQuery}" data-input="fu-q" data-key="fu-q">${icon('search', 16)}</label>
+      <label class="search-box"><input class="input" type="search" placeholder="${tr('بحث بالاسم أو رقم الملف أو الهوية أو المهمة', 'Search name, file no., ID or task')}" value="${ui.fuQuery}" data-input="fu-q" data-key="fu-q">${icon('search', 16)}</label>
       <select class="input" style="width:auto" data-change="fu-doctor" aria-label="${tr('الطبيب', 'Doctor')}">
         <option value="ALL">${tr('كل الأطباء', 'All doctors')}</option>${doctors.map((d) => html`<option value="${d}" ${ui.fuDoctor === d ? 'selected' : ''}>${dr(d)}</option>`)}
       </select>
@@ -108,7 +133,7 @@ export function render() {
       <div class="panel">${tasks.length ? html`<ul class="mini-list">${tasks.map((t) => html`
         <li><div>
           <div><span class="chip ${t.status === 'done' ? 'green' : ''}">${t.status === 'done' ? tr('أُنجزت', 'Done') : tr('أُلغيت', 'Cancelled')}</span> <span class="chip outline">${fuLabel(t.type)}</span> <strong>${t.title}</strong></div>
-          <div class="task-meta"><button class="patient-link" data-action="open-patient" data-id="${t.patientId}">${t.p.name}</button><span class="mrn">${t.p.mrn}</span><span>${fmtTime(t.closedAt)}</span></div>
+          <div class="task-meta"><button class="patient-link" data-action="open-patient" data-id="${t.patientId}">${t.p.name}</button><span class="mrn">${t.p.mrn}</span>${idChip(t.p)}<span>${fmtTime(t.closedAt)}</span></div>
           <div class="small" style="margin-top:4px">${t.outcome}</div>
         </div>
         ${t.status === 'done' ? html`<button class="btn btn-sm btn-ghost" data-action="reopen-task" data-id="${t.id}">${icon('undo', 16)} ${tr('إعادة فتح', 'Reopen')}</button>` : ''}</li>`)}</ul>`
@@ -256,8 +281,8 @@ function printList() {
   printTable({
     title: tr('قائمة المتابعات المفتوحة', 'Open follow-ups'),
     subtitle: [ui.fuType !== 'ALL' ? fuLabel(ui.fuType) : '', ui.fuDoctor !== 'ALL' ? dr(ui.fuDoctor) : ''].filter(Boolean).join(' — '),
-    columns: [{ label: tr('المريض', 'Patient') }, { label: tr('رقم الملف', 'File no.') }, { label: tr('الهاتف', 'Phone') }, { label: tr('النوع', 'Type') }, { label: tr('المطلوب', 'Task'), width: '32%' }, { label: tr('الطبيب', 'Doctor') }, { label: tr('الاستحقاق', 'Due') }, { label: tr('ملاحظات', 'Notes'), width: '14%' }],
-    rows: tasks.map((t) => [t.p.name, t.p.mrn, t.p.phone, fuLabel(t.type), t.title, t.physician ? dr(t.physician) : '', t.dueDate ? fmtDate(t.dueDate) : '—', '']),
+    columns: [{ label: tr('المريض', 'Patient') }, { label: tr('رقم الملف', 'File no.') }, { label: tr('رقم الهوية', 'ID no.') }, { label: tr('الهاتف', 'Phone') }, { label: tr('النوع', 'Type') }, { label: tr('المطلوب', 'Task'), width: '30%' }, { label: tr('الطبيب', 'Doctor') }, { label: tr('الاستحقاق', 'Due') }, { label: tr('ملاحظات', 'Notes'), width: '14%' }],
+    rows: tasks.map((t) => [t.p.name, t.p.mrn, t.p.nationalId || '', t.p.phone, fuLabel(t.type), t.title, t.physician ? dr(t.physician) : '', t.dueDate ? fmtDate(t.dueDate) : '—', '']),
   });
 }
 
@@ -276,6 +301,7 @@ registerActions({
   'fu-show': (el) => { ui.fuShow = el.dataset.v; },
   'fu-type': (el) => { ui.fuType = el.dataset.v; },
   'print-fu': () => printList(),
+  'fu-set-id': (el) => setNationalId(el.dataset.id),
 });
 registerChanges({
   'fu-doctor': (el) => { ui.fuDoctor = el.value; },

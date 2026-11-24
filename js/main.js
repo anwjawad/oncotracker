@@ -192,7 +192,7 @@ function renderGlobal() {
   const q = gInput.value.trim();
   if (!q) { gResults.hidden = true; return; }
   const nm = normMrn(q);
-  const hits = idx().lists.patients.filter((p) => (nm.length >= 3 && normMrn(p.mrn).includes(nm)) || matchesQuery(q, p.name) || (p.phone && p.phone.includes(q))).slice(0, 10);
+  const hits = idx().lists.patients.filter((p) => (nm.length >= 3 && normMrn(p.mrn).includes(nm)) || (q.length >= 4 && String(p.nationalId || '').includes(q)) || matchesQuery(q, p.name) || (p.phone && p.phone.includes(q))).slice(0, 10);
   gIndex = 0;
   gResults.innerHTML = hits.length
     ? hits.map((p, i) => `<button type="button" class="result ${i === 0 ? 'hi' : ''}" data-gid="${esc(p.id)}"><span>${esc(p.name)}</span><span class="meta ltr">${esc(p.mrn || '—')}${p.phone ? ' · ' + esc(p.phone) : ''}</span></button>`).join('')

@@ -57,7 +57,7 @@ function caseCard(c) {
   const deferredTo = c.deferredToId && get('committee', c.deferredToId);
   const ta = (field, label, ph) => html`
     <label class="field"><span>${label}</span>
-      <textarea class="cell-input" style="border-color:var(--line)" data-change="case-field" data-id="${c.id}" data-field="${field}" data-key="c-${c.id}-${field}" placeholder="${ph}" ${locked ? 'readonly' : ''}>${c[field] || ''}</textarea></label>`;
+      <textarea class="cell-input" style="border-color:var(--line)" data-autosave data-change="case-field" data-id="${c.id}" data-field="${field}" data-key="c-${c.id}-${field}" placeholder="${ph}" ${locked ? 'readonly' : ''}>${c[field] || ''}</textarea></label>`;
 
   return html`
   <article class="case" data-stage="${stage}">
@@ -384,7 +384,11 @@ registerActions({
   },
 });
 registerChanges({
-  'case-field': (el) => upsert('committee', { id: el.dataset.id, [el.dataset.field]: el.value.trim() }),
+  'case-field': (el) => {
+    const c = get('committee', el.dataset.id);
+    const v = el.value.trim();
+    if (c && v !== String(c[el.dataset.field] || '').trim()) upsert('committee', { id: c.id, [el.dataset.field]: v });
+  },
   'cm-date-pick': (el) => { if (el.value) ui.committeeDate = el.value; },
   'cm-q': (el) => { ui.committeeQuery = el.value; },
 });

@@ -186,6 +186,28 @@ document.addEventListener('input', (e) => {
   inputRender();
 });
 
+// Long free-text boxes marked data-autosave save while typing (after a short pause), not only when
+// the box loses focus, so closing the tab or locking the phone mid-sentence loses nothing.
+const autosaveTimers = new WeakMap();
+function autosaveNow(el) {
+  clearTimeout(autosaveTimers.get(el));
+  autosaveTimers.delete(el);
+  if (el.isConnected) changes[el.dataset.change]?.(el);
+}
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-autosave][data-change]');
+  if (!el) return;
+  clearTimeout(autosaveTimers.get(el));
+  autosaveTimers.set(el, setTimeout(() => autosaveNow(el), 800));
+});
+function saveFocusedBox() {
+  const el = document.activeElement;
+  if (el?.matches?.('[data-autosave][data-change]')) autosaveNow(el);
+  flush();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveFocusedBox(); });
+window.addEventListener('pagehide', saveFocusedBox);
+
 // ---------- global patient search ----------
 const gInput = $('#global-search');
 const gResults = $('#global-results');
@@ -230,7 +252,16 @@ async function manualSync() {
   catch (e) { toast(`${tr('تعذّرت المزامنة', 'Sync failed')}: ${e.message}`, { type: 'error' }); }
 }
 window.addEventListener('online', () => { flush(); sync().catch(() => {}); });
-setInterval(() => { if (document.visibilityState === 'visible') sync().catch(() => {}); }, 120000);
+// Every 2 minutes in general; every 15 seconds on the committee pages, where a doctor and the
+// coordinator work on the same session at the same time.
+const LIVE_ROUTES = new Set(['committee', 'coordinator']);
+let lastAutoSync = Date.now();
+setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  if (!LIVE_ROUTES.has(current) && Date.now() - lastAutoSync < 120000) return;
+  lastAutoSync = Date.now();
+  sync().catch(() => {});
+}, 15000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync().catch(() => {}); });
 document.addEventListener('settings-changed', () => { applyLang(); if (current === 'settings') render(); else renderChrome(); renderStatus(); });
 window.addEventListener('beforeunload', (e) => { if (store.status.pending) { e.preventDefault(); e.returnValue = ''; } });

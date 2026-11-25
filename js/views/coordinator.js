@@ -66,8 +66,8 @@ function caseCard(c) {
       <label class="field coord-notes">
         <span>${icon('edit', 14)} Coordinator notes — ${tr('ملاحظات المنسّق', 'notes from the meeting')}
           ${c.coordNotesAt ? html`<small class="muted">· ${tr('آخر حفظ', 'saved')} ${fmtTime(c.coordNotesAt)}${c.coordNotesBy ? ` — ${c.coordNotesBy}` : ''}</small>` : ''}</span>
-        <textarea class="cell-input" dir="auto" rows="3" data-change="coord-notes" data-id="${c.id}" data-key="coord-${c.id}" placeholder="${tr('ما قيل عن المريض في الاجتماع، المطلوب من المنسّق…', 'What was said about the patient in the meeting, what the coordinator needs to do…')}">${c.coordNotes || ''}</textarea>
-        <span class="hint">${tr('تُحفظ تلقائياً عند الخروج من المربع.', 'Saved automatically when you leave the box.')}</span>
+        <textarea class="cell-input" dir="auto" rows="3" data-autosave data-change="coord-notes" data-id="${c.id}" data-key="coord-${c.id}" placeholder="${tr('ما قيل عن المريض في الاجتماع، المطلوب من المنسّق…', 'What was said about the patient in the meeting, what the coordinator needs to do…')}">${c.coordNotes || ''}</textarea>
+        <span class="hint">${tr('تُحفظ تلقائياً أثناء الكتابة.', 'Saved automatically as you type.')}</span>
       </label>
 
       ${locked ? html`

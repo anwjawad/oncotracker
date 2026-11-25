@@ -260,9 +260,9 @@ setInterval(() => {
   if (document.visibilityState !== 'visible') return;
   if (!LIVE_ROUTES.has(current) && Date.now() - lastAutoSync < 120000) return;
   lastAutoSync = Date.now();
-  sync().catch(() => {});
+  sync({ quiet: true }).catch(() => {});
 }, 15000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync().catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync({ quiet: true }).catch(() => {}); });
 document.addEventListener('settings-changed', () => { applyLang(); if (current === 'settings') render(); else renderChrome(); renderStatus(); });
 window.addEventListener('beforeunload', (e) => { if (store.status.pending) { e.preventDefault(); e.returnValue = ''; } });
 

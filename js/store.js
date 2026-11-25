@@ -281,10 +281,12 @@ function unionIfList(table, field, serverVal, localVal) {
 }
 
 let syncing = false;
-export async function sync() {
+// quiet: a background refresh. It doesn't flash "Syncing…" and, when nothing changed on the
+// server, doesn't touch the page at all (open menus, selections and scroll stay as they are).
+export async function sync({ quiet = false } = {}) {
   if (syncing) return;
   syncing = true;
-  setStatus({ state: 'syncing' });
+  if (!quiet) setStatus({ state: 'syncing' });
   try {
     if (outbox.length) await flush();
     const res = await api.call('SYNC');
@@ -307,11 +309,12 @@ export async function sync() {
       for (const f of op.fields) if (f in op.row) merged[f] = unionIfList(op.table, f, server[f], op.row[f]);
       next[op.table][op.row.id] = merged;
     }
-    store.data = next;
+    const same = JSON.stringify(next) === JSON.stringify(store.data);
+    if (!same) store.data = next;
     store.serverTables = Object.keys(res.tables || {});
     if (outbox.length) scheduleFlush(50);
     setStatus({ state: outbox.length ? 'saving' : 'saved', lastSync: nowISO(), error: '', oldBackend: false });
-    changed();
+    if (!same) changed();
   } catch (e) {
     setStatus({ state: navigator.onLine ? 'error' : 'offline', error: e.message, oldBackend: !!e.oldBackend });
     throw e;

@@ -13,12 +13,13 @@ import * as committee from './views/committee.js';
 import * as clinic from './views/clinic.js';
 import * as followups from './views/followups.js';
 import * as tumorboard from './views/tumorboard.js';
+import * as coordinator from './views/coordinator.js';
 import * as patients from './views/patients.js';
 import * as quality from './views/quality.js';
 import * as reports from './views/reports.js';
 import * as settingsView from './views/settings.js';
 
-const ROUTES = { today, committee, tumorboard, clinic, followups, patients, quality, reports, settings: settingsView };
+const ROUTES = { today, committee, coordinator, tumorboard, clinic, followups, patients, quality, reports, settings: settingsView };
 const STABLE = new Set(['settings']);   // forms that must not be re-rendered by background changes
 let current = 'today';
 
@@ -54,6 +55,7 @@ document.addEventListener('focusout', () => { if (pendingRender) { pendingRender
 const NAV = {
   today: ['اليوم', 'Today'],
   committee: ['لجنة الحالات الجديدة', 'New cases committee'],
+  coordinator: ['منسّق الحالات الجديدة', 'New cases coordinator'],
   tumorboard: ['لجنة الأورام (Tumor Board)', 'Tumor board'],
   clinic: ['حجوزات ما بعد العيادة', 'Post-clinic bookings'],
   followups: ['المتابعات', 'Follow-ups'],

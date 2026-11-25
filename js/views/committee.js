@@ -27,7 +27,7 @@ export function onRoute(params) {
   }
 }
 
-function sessions() {
+export function sessions() {
   const counts = new Map();
   for (const c of idx().lists.committee) counts.set(c.sessionDate, (counts.get(c.sessionDate) || 0) + 1);
   const today = todayISO();

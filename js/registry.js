@@ -15,6 +15,8 @@ export const ui = {
   committeeFilter: 'all',
   committeeDoctor: 'ALL',
   committeeQuery: '',
+  coordFilter: 'all',
+  coordQuery: '',
   clinicDate: '',
   clinicDoctor: 'ALL',
   clinicQuery: '',

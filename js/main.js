@@ -14,12 +14,16 @@ import * as clinic from './views/clinic.js';
 import * as followups from './views/followups.js';
 import * as tumorboard from './views/tumorboard.js';
 import * as coordinator from './views/coordinator.js';
+import * as portcath from './views/portcath.js';
+import { store as pcStore, subscribe as pcSubscribe, loadCache as pcLoadCache, sync as pcSync, flush as pcFlush, pendingCount as pcPending } from './pc/store.js';
+import { api as pcApi, hasLocal as pcHasLocal } from './pc/api.js';
+import { seedDemo as pcSeedDemo } from './pc/demo.js';
 import * as patients from './views/patients.js';
 import * as quality from './views/quality.js';
 import * as reports from './views/reports.js';
 import * as settingsView from './views/settings.js';
 
-const ROUTES = { today, committee, coordinator, tumorboard, clinic, followups, patients, quality, reports, settings: settingsView };
+const ROUTES = { today, committee, coordinator, tumorboard, portcath, clinic, followups, patients, quality, reports, settings: settingsView };
 const STABLE = new Set(['settings']);   // forms that must not be re-rendered by background changes
 let current = 'today';
 
@@ -57,6 +61,7 @@ const NAV = {
   committee: ['لجنة الحالات الجديدة', 'New cases committee'],
   coordinator: ['منسّق الحالات الجديدة', 'New cases coordinator'],
   tumorboard: ['لجنة الأورام (Tumor Board)', 'Tumor board'],
+  portcath: ['Port Cath', 'Port Cath'],
   clinic: ['حجوزات ما بعد العيادة', 'Post-clinic bookings'],
   followups: ['المتابعات', 'Follow-ups'],
   patients: ['المرضى', 'Patients'],
@@ -89,6 +94,7 @@ function renderChrome() {
   $('[data-count=committee]').textContent = n || '';
   const tbOpen = idx().lists.tumorboard.filter((e) => e.status !== 'closed').reduce((k, e) => k + tumorboard.openTasksOf(e).length, 0);
   $('[data-count=tumorboard]').textContent = tbOpen || '';
+  $('[data-count=portcath]').textContent = portcath.navCount() || '';
   renderBanner();
 }
 
@@ -119,6 +125,11 @@ function renderStatus() {
 const scheduleRender = debounce(render, 30);
 hooks.rerender = scheduleRender;
 subscribe((evt) => { renderStatus(); if (evt?.statusOnly) return; if (!STABLE.has(current)) scheduleRender(); else renderChrome(); });
+// Port Cath has its own store (MedSched's sheet): redraw its page, the patient record and the nav count.
+pcSubscribe((evt) => {
+  if (current === 'portcath' && (!evt?.statusOnly || !pcStore.loaded || pcStore.status.state === 'error' || pcStore.status.pending)) scheduleRender();
+  else if (!evt?.statusOnly) { renderChrome(); if (drawerState.id) renderDrawer(); }
+});
 
 function switchLanguage(next) {
   settings.set({ lang: next });
@@ -204,6 +215,7 @@ function saveFocusedBox() {
   const el = document.activeElement;
   if (el?.matches?.('[data-autosave][data-change]')) autosaveNow(el);
   flush();
+  pcFlush();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveFocusedBox(); });
 window.addEventListener('pagehide', saveFocusedBox);
@@ -251,30 +263,40 @@ async function manualSync() {
   try { await sync(); toast(tr('البيانات محدّثة', 'Up to date')); }
   catch (e) { toast(`${tr('تعذّرت المزامنة', 'Sync failed')}: ${e.message}`, { type: 'error' }); }
 }
-window.addEventListener('online', () => { flush(); sync().catch(() => {}); });
+window.addEventListener('online', () => { flush(); sync().catch(() => {}); pcFlush(); syncPortCath(); });
+
+// Port Cath: demo mode gets made-up bookings built from the demo patients.
+function syncPortCath(opts) {
+  if (pcApi.mode() === 'local' && !pcHasLocal()) pcSeedDemo(idx().lists.patients);
+  return pcSync(opts).catch(() => {});
+}
+let lastPcSync = Date.now();
 // Every 2 minutes in general; every 15 seconds on the committee pages, where a doctor and the
 // coordinator work on the same session at the same time.
 const LIVE_ROUTES = new Set(['committee', 'coordinator']);
 let lastAutoSync = Date.now();
 setInterval(() => {
   if (document.visibilityState !== 'visible') return;
+  // Port Cath page: refresh MedSched's list every 15 seconds; elsewhere every 2 minutes.
+  if (current === 'portcath' || Date.now() - lastPcSync >= 120000) { lastPcSync = Date.now(); syncPortCath({ quiet: true }); }
   if (!LIVE_ROUTES.has(current) && Date.now() - lastAutoSync < 120000) return;
   lastAutoSync = Date.now();
   sync({ quiet: true }).catch(() => {});
 }, 15000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync({ quiet: true }).catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { sync({ quiet: true }).catch(() => {}); syncPortCath({ quiet: true }); } });
 document.addEventListener('settings-changed', () => { applyLang(); if (current === 'settings') render(); else renderChrome(); renderStatus(); });
-window.addEventListener('beforeunload', (e) => { if (store.status.pending) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', (e) => { if (store.status.pending || pcPending()) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- boot ----------
 applyTheme();
 applyLang();
 const hadCache = loadCache();
+pcLoadCache();
 route();
 renderStatus();
 sync().catch((e) => {
   if (!hadCache) toast(`${tr('تعذّر تحميل البيانات', 'Could not load data')}: ${e.message}`, { type: 'error' });
-});
+}).finally(() => syncPortCath());
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -4,6 +4,9 @@ import { idx, patient, upsert, remove, batch, store } from './store.js';
 import { issuesFor, fuLabel, CASE_STATUS, caseStage, attemptLabel, fixPhone } from './rules.js';
 import { icon, modal, toast, confirmBox, telLink, dueChip, physicianFieldHTML, mountPhysicianField, readPhysician } from './ui.js';
 import { registerActions } from './registry.js';
+import { bookingsFor } from './views/portcath.js';
+import { pcStatus } from './pc/model.js';
+import { store as pcStore } from './pc/store.js';
 import { tr, dr, lang } from './i18n.js';
 
 export const drawerState = { id: null };
@@ -103,6 +106,7 @@ export function renderDrawer() {
       </section>
 
       ${tumorBoardPanel(p)}
+      ${portCathPanel(p)}
 
       <section class="panel">
         <div class="panel-head"><h3>${tr('زيارات العيادة', 'Clinic visits')}</h3>
@@ -339,3 +343,20 @@ registerActions({
   'merge-patients': (el) => mergePatients(el.dataset.ids.split(',')),
   'delete-patient': (el) => deletePatient(el.dataset.id),
 });
+
+// Port Cath bookings for this patient (MedSched's list, matched by file number).
+function portCathPanel(p) {
+  const rows = bookingsFor(p);
+  return html`
+    <section class="panel">
+      <div class="panel-head"><h3>Port Cath</h3>
+        <button class="btn btn-sm" data-action="pc-book-patient" data-pid="${p.id}">${icon('plus', 16)} ${tr('حجز Port Cath', 'Book port cath')}</button></div>
+      ${rows.length ? html`<ul class="mini-list">${rows.map((b) => { const st = pcStatus(b); return html`
+        <li><div>
+          <div><strong>${b.date ? fmtDate(b.date, 'med') : tr('قائمة الانتظار', 'Waiting list')}</strong> <span class="chip ${st.tone === 'grey' ? '' : st.tone}">${st.label}</span></div>
+          ${b.notes || b.diagnosis ? html`<div class="small muted">${[b.diagnosis, b.notes].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>
+        <a class="btn btn-sm btn-ghost" href="#/portcath?focus=${b.id}" data-action="close-drawer">${tr('فتح', 'Open')}</a></li>`; })}</ul>`
+        : html`<div class="empty">${pcStore.loaded ? tr('لا يوجد حجز Port Cath لهذا المريض.', 'No port cath booking for this patient.') : tr('جاري تحميل قائمة Port Cath…', 'Loading the Port Cath list…')}</div>`}
+    </section>`;
+}

@@ -1,11 +1,13 @@
 // Offline shell: network first for app files, cached copy when offline.
 // Data never goes through this cache — it lives in the Google Sheet.
-const CACHE = 'onco-v2-shell-11';
+const CACHE = 'onco-v2-shell-12';
 const SHELL = [
   './', 'index.html', 'manifest.json', 'css/app.css',
   'js/main.js', 'js/i18n.js', 'js/util.js', 'js/settings.js', 'js/api.js', 'js/store.js', 'js/rules.js', 'js/ui.js', 'js/registry.js',
   'js/patient.js', 'js/print.js', 'js/importer.js', 'js/demo.js', 'js/wordimport.js',
   'js/views/today.js', 'js/views/committee.js', 'js/views/tumorboard.js', 'js/views/coordinator.js', 'js/views/clinic.js', 'js/views/followups.js',
+  'js/views/portcath.js', 'js/pc/util.js', 'js/pc/api.js', 'js/pc/store.js', 'js/pc/model.js', 'js/pc/ui.js', 'js/pc/print.js', 'js/pc/docx.js', 'js/pc/checklist.js', 'js/pc/demo.js',
+  'icons/cvad-header.png', 'icons/stamp-jawad.png',
   'js/views/patients.js', 'js/views/quality.js', 'js/views/reports.js', 'js/views/settings.js',
 ];
 

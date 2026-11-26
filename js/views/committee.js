@@ -7,6 +7,7 @@ import { CASE_STATUS, readiness, caseStage, FU_TYPES, fuLabel } from '../rules.j
 import { icon, modal, toast, confirmBox, menu, patientPickerHTML, mountPatientPicker, resolvePatient, validatePicker, physicianFieldHTML, mountPhysicianField, readPhysician } from '../ui.js';
 import { settings } from '../settings.js';
 import { printTable } from '../print.js';
+import { output as wordOutput } from '../pc/print.js';
 import { openImport } from '../importer.js';
 import { registerActions, registerChanges, ui } from '../registry.js';
 import { tr, dr } from '../i18n.js';
@@ -160,6 +161,7 @@ export function render() {
         <button class="btn" data-action="cm-import">${icon('upload')} ${tr('استيراد Excel', 'Import Excel')}</button>
         <button class="btn" data-action="cm-print" data-v="agenda">${icon('print')} ${tr('جدول الأعمال', 'Agenda')}</button>
         <button class="btn" data-action="cm-print" data-v="minutes">${icon('print')} ${tr('محضر القرارات', 'Minutes')}</button>
+        <button class="btn" data-action="cm-word" title="${tr('تنزيل حالات الجلسة كملف Word', 'Download the session cases as a Word file')}">${icon('download')} Word (.docx)</button>
         <button class="btn btn-primary" data-action="cm-add">${icon('plus')} ${tr('إدراج حالة', 'Add case')}</button>
       </div>
     </div>
@@ -358,6 +360,31 @@ function print(kind) {
   }
 }
 
+// Word file of the session (or the chosen doctor): one table, doctors one after another.
+// Used by this page and by the New cases coordinator page.
+export async function exportWord({ title = 'New Cases Committee' } = {}) {
+  const cases = idx().lists.committee.filter((c) => c.sessionDate === ui.committeeDate && c.status !== 'withdrawn' && (ui.committeeDoctor === 'ALL' || docKey(c) === ui.committeeDoctor))
+    .sort((a, b) => (!docKey(a) - !docKey(b)) || byText(a.physician, b.physician) || String(a.createdAt).localeCompare(String(b.createdAt)));
+  if (!cases.length) { toast(tr('لا توجد حالات للتصدير في هذه الجلسة.', 'No cases to export in this session.'), { type: 'error' }); return; }
+  const when = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(ui.committeeDate + 'T00:00:00'));
+  await wordOutput({
+    title,
+    subtitle: ui.committeeDoctor !== 'ALL' ? `Dr. ${ui.committeeDoctor}` : '',
+    when,
+    landscape: true,
+    fileDate: ui.committeeDate,
+    summary: [{ value: cases.length, label: cases.length === 1 ? 'case' : 'cases' }],
+    sections: [{
+      columns: [{ label: 'Patient', width: '17%' }, { label: 'File no.', width: '9%' }, { label: 'Brief history', width: '36%' }, { label: 'Question', width: '24%' }, { label: 'Doctor' }],
+      rows: cases.map((c) => {
+        const p = patient(c.patientId) || {};
+        return [p.name || 'Unknown patient', p.mrn || '', c.briefHistory || '', c.question || '', c.physician ? `Dr. ${c.physician}` : ''];
+      }),
+    }],
+    preparedBy: settings.get('userName') || '',
+  }, 'word');
+}
+
 registerActions({
   'cm-date': (el) => { ui.committeeDate = el.dataset.v; },
   'cm-doctor': (el) => { ui.committeeDoctor = el.dataset.v; },
@@ -365,6 +392,7 @@ registerActions({
   'cm-add': () => referToCommittee(),
   'cm-import': () => openImport('committee', ui.committeeDate),
   'cm-print': (el) => print(el.dataset.v),
+  'cm-word': () => exportWord(),
   'refer-committee': (el) => referToCommittee({ patientId: el.dataset.patient }),
   'case-ready': (el) => {
     const c = get('committee', el.dataset.id);

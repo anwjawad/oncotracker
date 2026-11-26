@@ -11,7 +11,7 @@ import { settings } from '../settings.js';
 import { printTable } from '../print.js';
 import { registerActions, registerChanges, ui } from '../registry.js';
 import { tr, dr } from '../i18n.js';
-import { sessions, onRoute as committeeRoute } from './committee.js';
+import { sessions, onRoute as committeeRoute, exportWord } from './committee.js';
 
 export const title = () => tr('منسّق الحالات الجديدة', 'New cases coordinator');
 export const onRoute = committeeRoute;
@@ -136,6 +136,7 @@ export function render() {
       </div>
       <div class="row">
         <button class="btn" data-action="coord-print">${icon('print')} ${tr('طباعة مع ملاحظات المنسّق', 'Print with coordinator notes')}</button>
+        <button class="btn" data-action="coord-word" title="${tr('تنزيل حالات الجلسة كملف Word', 'Download the session cases as a Word file')}">${icon('download')} Word (.docx)</button>
       </div>
     </div>
 
@@ -158,9 +159,13 @@ export function render() {
           ${total ? '' : tr('الحالات التي يضيفها الأطباء في «لجنة الحالات الجديدة» تظهر هنا مباشرة.', 'Cases the doctors add in "New cases committee" appear here right away.')}</div>`}`;
 }
 
-function print() {
-  const cases = sessionCases().filter((c) => ui.committeeDoctor === 'ALL' || docKey(c) === ui.committeeDoctor)
+function printCases() {
+  return sessionCases().filter((c) => ui.committeeDoctor === 'ALL' || docKey(c) === ui.committeeDoctor)
     .sort((a, b) => byText(a.physician, b.physician) || String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+function print() {
+  const cases = printCases();
   if (!cases.length) { toast(tr('لا توجد حالات للطباعة في هذه الجلسة.', 'No cases to print in this session.'), { type: 'error' }); return; }
   const status = (c) => {
     const p = patient(c.patientId) || {};
@@ -181,6 +186,7 @@ function print() {
 registerActions({
   'coord-filter': (el) => { ui.coordFilter = el.dataset.v; },
   'coord-print': () => print(),
+  'coord-word': () => exportWord({ title: 'New Cases Coordinator' }),
 });
 registerChanges({
   'coord-notes': (el) => {
